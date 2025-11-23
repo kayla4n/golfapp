@@ -320,9 +320,15 @@ async function selectCourse(course) {
             throw new Error(`Failed to fetch course details: ${response.status} ${response.statusText}`);
         }
 
-        const courseDetails = await response.json();
-        console.log('✅ Received course details:', courseDetails);
-        setupRoundWithCourse(courseDetails, course);
+        const data = await response.json();
+        console.log('✅ Full API response:', data);
+
+        // CRITICAL: Extract the nested "course" property from the response
+        const courseData = data.course;
+        console.log('✅ Extracted course data:', courseData);
+        console.log('✅ Course tees structure:', courseData.tees);
+
+        setupRoundWithCourse(courseData, course);
 
     } catch (error) {
         console.error('❌ Error fetching course details:', error);
