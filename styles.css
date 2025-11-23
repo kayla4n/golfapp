@@ -1,0 +1,421 @@
+/* ===================================
+   MOBILE-FIRST CSS
+   Starting with mobile styles, then adding desktop enhancements
+   =================================== */
+
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 10px;
+    color: #333;
+}
+
+/* Main app container */
+.app-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    min-height: calc(100vh - 20px);
+}
+
+/* Screen management - only show active screen */
+.screen {
+    display: none;
+    padding: 20px;
+}
+
+.screen.active {
+    display: block;
+}
+
+/* Typography */
+h1 {
+    font-size: 28px;
+    color: #667eea;
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+h2 {
+    font-size: 22px;
+    color: #333;
+    margin-bottom: 16px;
+}
+
+/* ===================================
+   FORM STYLES
+   =================================== */
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #555;
+    font-size: 14px;
+}
+
+/* Touch-friendly inputs - minimum 44px height */
+input[type="text"],
+input[type="date"] {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    transition: border-color 0.3s;
+}
+
+input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.player-input {
+    margin-bottom: 10px;
+}
+
+/* ===================================
+   BUTTONS - Large touch targets
+   =================================== */
+
+button {
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    min-height: 48px; /* iOS touch target recommendation */
+    font-family: inherit;
+}
+
+.btn-primary {
+    width: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px;
+    margin-top: 10px;
+}
+
+.btn-primary:active {
+    transform: scale(0.98);
+}
+
+.btn-secondary {
+    width: 100%;
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+    padding: 12px;
+}
+
+.btn-secondary:active {
+    background: #f5f5f5;
+}
+
+.btn-back {
+    background: #f5f5f5;
+    color: #333;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+}
+
+/* ===================================
+   SCORE SCREEN STYLES
+   =================================== */
+
+.score-header {
+    margin-bottom: 20px;
+}
+
+.round-info {
+    text-align: center;
+    margin-top: 10px;
+}
+
+.round-info h2 {
+    margin-bottom: 4px;
+}
+
+.round-info p {
+    color: #666;
+    font-size: 14px;
+}
+
+/* Hole navigation */
+.hole-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 10px;
+}
+
+.btn-nav {
+    flex: 1;
+    background: #667eea;
+    color: white;
+    padding: 12px;
+}
+
+.btn-nav:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+#currentHoleDisplay {
+    flex: 2;
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: #667eea;
+    margin: 0;
+}
+
+/* Par selector */
+.hole-info {
+    background: #f9f9f9;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.par-selector {
+    text-align: center;
+}
+
+.par-selector label {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.par-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.par-btn {
+    width: 60px;
+    height: 60px;
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    font-size: 20px;
+    font-weight: bold;
+    color: #666;
+}
+
+.par-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+/* Player score cards */
+.players-score-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.player-card {
+    background: #f9f9f9;
+    padding: 16px;
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+}
+
+.player-card h3 {
+    margin-bottom: 16px;
+    color: #667eea;
+    font-size: 18px;
+}
+
+.score-control {
+    margin-bottom: 16px;
+}
+
+.score-control label {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.score-input {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.score-btn {
+    width: 50px;
+    height: 50px;
+    background: #667eea;
+    color: white;
+    font-size: 24px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.score-btn:active {
+    background: #5568d3;
+}
+
+.score-value {
+    flex: 1;
+    text-align: center;
+    font-size: 32px;
+    font-weight: bold;
+    color: #333;
+    background: white;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.player-stats {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #ddd;
+}
+
+.stat {
+    text-align: center;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.stat-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+}
+
+.stat-value.under-par {
+    color: #22c55e;
+}
+
+.stat-value.over-par {
+    color: #ef4444;
+}
+
+/* ===================================
+   SCORECARD TABLE
+   =================================== */
+
+.scorecard-container {
+    overflow-x: auto;
+    margin-bottom: 20px;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+.scorecard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 500px; /* Allow horizontal scroll on small screens */
+}
+
+.scorecard-table th,
+.scorecard-table td {
+    padding: 10px 8px;
+    text-align: center;
+    border: 1px solid #ddd;
+}
+
+.scorecard-table th {
+    background: #667eea;
+    color: white;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+}
+
+.scorecard-table tr:nth-child(even) {
+    background: #f9f9f9;
+}
+
+.scorecard-table .player-name {
+    text-align: left;
+    font-weight: 600;
+    color: #667eea;
+}
+
+.scorecard-table .total-col {
+    background: #f0f0f0;
+    font-weight: bold;
+}
+
+/* ===================================
+   DESKTOP STYLES (larger screens)
+   =================================== */
+
+@media (min-width: 768px) {
+    body {
+        padding: 30px;
+    }
+
+    .app-container {
+        max-width: 900px;
+    }
+
+    .screen {
+        padding: 40px;
+    }
+
+    h1 {
+        font-size: 36px;
+    }
+
+    /* Show player cards side by side on desktop */
+    .players-score-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .scorecard-table {
+        font-size: 16px;
+    }
+}
+
+/* ===================================
+   UTILITY CLASSES
+   =================================== */
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Prevent text selection on buttons (better mobile experience) */
+button {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
