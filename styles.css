@@ -18,6 +18,129 @@ body {
     color: #333;
 }
 
+/* ===================================
+   HAMBURGER MENU & SIDEBAR
+   =================================== */
+
+/* Hamburger button - fixed to top left */
+.hamburger-btn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+    width: 50px;
+    height: 50px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: #667eea;
+    transition: transform 0.3s;
+}
+
+.hamburger-btn:active {
+    transform: scale(0.95);
+}
+
+/* Sidebar overlay - dark background */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1001;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.sidebar-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Sidebar navigation */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px; /* Hidden off-screen to the left */
+    width: 280px;
+    height: 100%;
+    background: white;
+    z-index: 1002;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
+    transition: left 0.3s ease-in-out;
+    overflow-y: auto;
+}
+
+.sidebar.active {
+    left: 0; /* Slide in */
+}
+
+/* Sidebar header */
+.sidebar-header {
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sidebar-header h2 {
+    font-size: 20px;
+    margin: 0;
+    color: white;
+}
+
+.close-sidebar-btn {
+    background: transparent;
+    color: white;
+    font-size: 24px;
+    width: 36px;
+    height: 36px;
+    min-height: auto;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Sidebar menu */
+.sidebar-menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-menu li {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.menu-item {
+    display: block;
+    padding: 18px 20px;
+    color: #333;
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.menu-item:hover,
+.menu-item:active {
+    background: #f5f5f5;
+}
+
+.menu-item:active {
+    background: #e8e8e8;
+}
+
 /* Main app container */
 .app-container {
     max-width: 600px;
@@ -418,4 +541,214 @@ button {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
+}
+
+/* ===================================
+   COURSE SEARCH SCREEN
+   =================================== */
+
+.search-results {
+    margin-top: 20px;
+}
+
+.course-result {
+    background: #f9f9f9;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.course-result:active {
+    background: #e8e8e8;
+    transform: scale(0.98);
+}
+
+.course-result h3 {
+    color: #667eea;
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+.course-result p {
+    color: #666;
+    font-size: 14px;
+    margin: 4px 0;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 40px;
+    font-size: 16px;
+    color: #666;
+}
+
+/* ===================================
+   HISTORY SCREEN
+   =================================== */
+
+.history-list {
+    margin-bottom: 20px;
+}
+
+.history-item {
+    background: #f9f9f9;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.history-item:active {
+    background: #e8e8e8;
+    transform: scale(0.98);
+}
+
+.history-item h3 {
+    color: #667eea;
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+.history-item .history-date {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.history-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.player-score-badge {
+    background: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    border: 1px solid #ddd;
+}
+
+.player-score-badge .player-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.player-score-badge .score {
+    color: #667eea;
+    margin-left: 4px;
+}
+
+.empty-history {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+}
+
+.empty-history p {
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+/* ===================================
+   PLAYER STATS SCREEN
+   =================================== */
+
+.player-stats-list {
+    margin-bottom: 20px;
+}
+
+.player-stats-item {
+    background: #f9f9f9;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    border: 2px solid #e0e0e0;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.player-stats-item:active {
+    background: #e8e8e8;
+    transform: scale(0.98);
+}
+
+.player-stats-item h3 {
+    color: #667eea;
+    font-size: 20px;
+    margin-bottom: 12px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.stat-box {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.stat-box .stat-label {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.stat-box .stat-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+}
+
+.stat-box .stat-value.positive {
+    color: #22c55e;
+}
+
+.stat-box .stat-value.negative {
+    color: #ef4444;
+}
+
+/* Player detail stats */
+.player-detail-stats {
+    margin-top: 20px;
+}
+
+.stats-section {
+    margin-bottom: 30px;
+}
+
+.stats-section h3 {
+    color: #667eea;
+    font-size: 18px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.course-breakdown {
+    background: #f9f9f9;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+}
+
+.course-breakdown h4 {
+    color: #333;
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.course-breakdown p {
+    color: #666;
+    font-size: 14px;
+    margin: 4px 0;
 }

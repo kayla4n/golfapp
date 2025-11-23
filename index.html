@@ -7,6 +7,27 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Hamburger Menu Button (fixed to top) -->
+    <button id="hamburgerBtn" class="hamburger-btn" aria-label="Open menu">
+        <span>☰</span>
+    </button>
+
+    <!-- Sidebar Overlay (dark background when menu is open) -->
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <h2>🏌️ Golf Tracker</h2>
+            <button id="closeSidebarBtn" class="close-sidebar-btn" aria-label="Close menu">✕</button>
+        </div>
+        <ul class="sidebar-menu">
+            <li><a href="#" id="navScoreEntry" class="menu-item">⛳ Score Entry</a></li>
+            <li><a href="#" id="navCourseHistory" class="menu-item">📊 Course History</a></li>
+            <li><a href="#" id="navPlayerStats" class="menu-item">👤 Player Stats</a></li>
+        </ul>
+    </nav>
+
     <!-- Main container for the entire app -->
     <div class="app-container">
 
@@ -85,7 +106,73 @@
             </div>
 
             <div class="action-buttons">
-                <button class="btn-primary" id="finishRoundBtn">Finish Round</button>
+                <button class="btn-primary" id="saveFinishBtn">Save & Finish Round</button>
+            </div>
+        </div>
+
+        <!-- SCREEN 4: Course Search (Golf Course API) -->
+        <div id="courseSearchScreen" class="screen">
+            <h1>🔍 Find Golf Course</h1>
+
+            <div class="form-group">
+                <label for="courseSearchInput">Search for a golf course</label>
+                <input type="text" id="courseSearchInput" placeholder="Enter course name or city">
+                <button class="btn-primary" id="searchCoursesBtn">Search Courses</button>
+            </div>
+
+            <div id="searchResults" class="search-results">
+                <!-- Search results will appear here -->
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-secondary" id="manualCourseBtn">Enter Course Manually</button>
+            </div>
+        </div>
+
+        <!-- SCREEN 5: Course History -->
+        <div id="historyScreen" class="screen">
+            <h1>📊 Course History</h1>
+
+            <div id="historyList" class="history-list">
+                <!-- Past rounds will be listed here -->
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-primary" id="startNewRoundBtn">Start New Round</button>
+            </div>
+        </div>
+
+        <!-- SCREEN 6: Round Detail (viewing a past round) -->
+        <div id="roundDetailScreen" class="screen">
+            <div class="score-header">
+                <button class="btn-back" id="backToHistoryBtn">← Back to History</button>
+                <h2 id="detailCourseName"></h2>
+                <p id="detailRoundDate"></p>
+            </div>
+
+            <div id="detailScorecard" class="scorecard-container">
+                <!-- Detailed scorecard will be shown here -->
+            </div>
+        </div>
+
+        <!-- SCREEN 7: Player Statistics -->
+        <div id="statsScreen" class="screen">
+            <h1>👤 Player Stats</h1>
+
+            <div id="playerStatsList" class="player-stats-list">
+                <!-- List of all players will appear here -->
+            </div>
+        </div>
+
+        <!-- SCREEN 8: Individual Player Detail -->
+        <div id="playerDetailScreen" class="screen">
+            <div class="score-header">
+                <button class="btn-back" id="backToStatsBtn">← Back to Stats</button>
+                <h2 id="playerDetailName"></h2>
+            </div>
+
+            <div id="playerDetailStats" class="player-detail-stats">
+                <!-- Detailed player statistics will be shown here -->
             </div>
         </div>
 
