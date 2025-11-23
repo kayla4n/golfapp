@@ -1,31 +1,44 @@
 // ===================================
-// GOLF SCORE TRACKER APP
+// GOLF SCORE TRACKER APP - ENHANCED VERSION
 // ===================================
 
-// This object will hold all our app's data
+// API Configuration for Golf Course API
+const GOLF_API_KEY = '274CKOV66N2XQTKWVD4EDPBIYM';
+const GOLF_API_BASE = 'https://externalapi.golfgenius.com/v2';
+
+// ===================================
+// DATA STRUCTURE
+// ===================================
+
+// Current round data
 let appData = {
     courseName: '',
+    courseId: null,
+    courseCity: '',
+    courseState: '',
     roundDate: '',
     players: [],
     currentHole: 1,
-    holes: [] // Array to store par and scores for each hole
+    holes: [] // Array of hole objects with par, yardage, handicap, scores
 };
 
-// Initialize holes array with default par values (par 4 for all holes)
-function initializeHoles() {
-    appData.holes = [];
-    for (let i = 1; i <= 18; i++) {
-        appData.holes.push({
-            number: i,
-            par: 4,
-            scores: {} // Will hold scores for each player
-        });
-    }
-}
+// Stored data in localStorage
+// - currentRound: The active round (appData)
+// - roundHistory: Array of completed rounds
+// - playerStats: Object with player statistics
 
 // ===================================
-// DOM ELEMENTS - Getting references to HTML elements
+// DOM ELEMENTS
 // ===================================
+
+// Sidebar elements
+const hamburgerBtn = document.getElementById('hamburgerBtn');
+const sidebar = document.getElementById('sidebar');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+const navScoreEntry = document.getElementById('navScoreEntry');
+const navCourseHistory = document.getElementById('navCourseHistory');
+const navPlayerStats = document.getElementById('navPlayerStats');
 
 // Setup Screen Elements
 const setupScreen = document.getElementById('setupScreen');
@@ -34,6 +47,13 @@ const roundDateInput = document.getElementById('roundDate');
 const playersList = document.getElementById('playersList');
 const addPlayerBtn = document.getElementById('addPlayerBtn');
 const startRoundBtn = document.getElementById('startRoundBtn');
+
+// Course Search Screen
+const courseSearchScreen = document.getElementById('courseSearchScreen');
+const courseSearchInput = document.getElementById('courseSearchInput');
+const searchCoursesBtn = document.getElementById('searchCoursesBtn');
+const searchResults = document.getElementById('searchResults');
+const manualCourseBtn = document.getElementById('manualCourseBtn');
 
 // Score Screen Elements
 const scoreScreen = document.getElementById('scoreScreen');
@@ -50,7 +70,29 @@ const viewScoresBtn = document.getElementById('viewScoresBtn');
 const scorecardScreen = document.getElementById('scorecardScreen');
 const backToScoreBtn = document.getElementById('backToScoreBtn');
 const scorecardContainer = document.getElementById('scorecardContainer');
-const finishRoundBtn = document.getElementById('finishRoundBtn');
+const saveFinishBtn = document.getElementById('saveFinishBtn');
+
+// History Screen
+const historyScreen = document.getElementById('historyScreen');
+const historyList = document.getElementById('historyList');
+const startNewRoundBtn = document.getElementById('startNewRoundBtn');
+
+// Round Detail Screen
+const roundDetailScreen = document.getElementById('roundDetailScreen');
+const backToHistoryBtn = document.getElementById('backToHistoryBtn');
+const detailCourseName = document.getElementById('detailCourseName');
+const detailRoundDate = document.getElementById('detailRoundDate');
+const detailScorecard = document.getElementById('detailScorecard');
+
+// Player Stats Screen
+const statsScreen = document.getElementById('statsScreen');
+const playerStatsList = document.getElementById('playerStatsList');
+
+// Player Detail Screen
+const playerDetailScreen = document.getElementById('playerDetailScreen');
+const backToStatsBtn = document.getElementById('backToStatsBtn');
+const playerDetailName = document.getElementById('playerDetailName');
+const playerDetailStats = document.getElementById('playerDetailStats');
 
 // ===================================
 // INITIALIZATION
@@ -59,18 +101,220 @@ const finishRoundBtn = document.getElementById('finishRoundBtn');
 // Set today's date as default
 roundDateInput.valueAsDate = new Date();
 
+// Initialize holes array with default par values
+function initializeHoles() {
+    appData.holes = [];
+    for (let i = 1; i <= 18; i++) {
+        appData.holes.push({
+            number: i,
+            par: 4,
+            yardage: null,
+            handicap: null,
+            scores: {} // Will hold scores for each player
+        });
+    }
+}
+
+// ===================================
+// SIDEBAR NAVIGATION
+// ===================================
+
+function openSidebar() {
+    sidebar.classList.add('active');
+    sidebarOverlay.classList.add('active');
+}
+
+function closeSidebar() {
+    sidebar.classList.remove('active');
+    sidebarOverlay.classList.remove('active');
+}
+
+hamburgerBtn.addEventListener('click', openSidebar);
+closeSidebarBtn.addEventListener('click', closeSidebar);
+sidebarOverlay.addEventListener('click', closeSidebar);
+
+// Navigation handlers
+navScoreEntry.addEventListener('click', (e) => {
+    e.preventDefault();
+    closeSidebar();
+
+    // Check if there's an active round
+    const savedRound = localStorage.getItem('currentRound');
+    if (savedRound) {
+        // Resume the current round
+        loadCurrentRound();
+        showScreen(scoreScreen);
+    } else {
+        // Start a new round - show course search
+        showScreen(courseSearchScreen);
+    }
+});
+
+navCourseHistory.addEventListener('click', (e) => {
+    e.preventDefault();
+    closeSidebar();
+    displayHistory();
+    showScreen(historyScreen);
+});
+
+navPlayerStats.addEventListener('click', (e) => {
+    e.preventDefault();
+    closeSidebar();
+    displayPlayerStats();
+    showScreen(statsScreen);
+});
+
 // ===================================
 // SCREEN NAVIGATION
 // ===================================
 
 function showScreen(screenToShow) {
-    // Hide all screens
     document.querySelectorAll('.screen').forEach(screen => {
         screen.classList.remove('active');
     });
-    // Show the requested screen
     screenToShow.classList.add('active');
 }
+
+// ===================================
+// GOLF COURSE API INTEGRATION
+// ===================================
+
+// Search for golf courses
+searchCoursesBtn.addEventListener('click', async () => {
+    const query = courseSearchInput.value.trim();
+
+    if (!query) {
+        alert('Please enter a course name or city to search');
+        return;
+    }
+
+    searchResults.innerHTML = '<div class="loading-spinner">🏌️ Searching for courses...</div>';
+
+    try {
+        // Use the Golf Course API to search
+        const response = await fetch(`${GOLF_API_BASE}/courses?name=${encodeURIComponent(query)}`, {
+            headers: {
+                'Authorization': `Key ${GOLF_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch courses');
+        }
+
+        const data = await response.json();
+        displayCourseResults(data.courses || []);
+
+    } catch (error) {
+        console.error('Error searching courses:', error);
+        searchResults.innerHTML = `
+            <div class="empty-history">
+                <p>⚠️ Unable to search courses</p>
+                <p style="font-size: 14px;">Please check your internet connection or try again later.</p>
+            </div>
+        `;
+    }
+});
+
+// Display course search results
+function displayCourseResults(courses) {
+    if (courses.length === 0) {
+        searchResults.innerHTML = `
+            <div class="empty-history">
+                <p>No courses found</p>
+                <p style="font-size: 14px;">Try a different search term or enter manually.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Filter/prioritize California and Hawaii courses if possible
+    const priorityStates = ['CA', 'HI'];
+    const priorityCourses = courses.filter(c => priorityStates.includes(c.state));
+    const otherCourses = courses.filter(c => !priorityStates.includes(c.state));
+    const sortedCourses = [...priorityCourses, ...otherCourses];
+
+    searchResults.innerHTML = '';
+
+    sortedCourses.forEach(course => {
+        const courseDiv = document.createElement('div');
+        courseDiv.className = 'course-result';
+        courseDiv.innerHTML = `
+            <h3>${course.name}</h3>
+            <p>📍 ${course.city}, ${course.state} ${course.zip || ''}</p>
+            ${course.phone ? `<p>📞 ${course.phone}</p>` : ''}
+        `;
+
+        courseDiv.addEventListener('click', () => selectCourse(course));
+        searchResults.appendChild(courseDiv);
+    });
+}
+
+// When a course is selected, fetch its hole details
+async function selectCourse(course) {
+    searchResults.innerHTML = '<div class="loading-spinner">📊 Loading course details...</div>';
+
+    try {
+        // Fetch course details including holes
+        const response = await fetch(`${GOLF_API_BASE}/courses/${course.id}`, {
+            headers: {
+                'Authorization': `Key ${GOLF_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch course details');
+        }
+
+        const courseDetails = await response.json();
+        setupRoundWithCourse(courseDetails);
+
+    } catch (error) {
+        console.error('Error fetching course details:', error);
+        alert('Unable to load course details. You can still enter the course manually.');
+        showScreen(setupScreen);
+    }
+}
+
+// Setup round with course data from API
+function setupRoundWithCourse(courseDetails) {
+    appData.courseName = courseDetails.name;
+    appData.courseId = courseDetails.id;
+    appData.courseCity = courseDetails.city;
+    appData.courseState = courseDetails.state;
+
+    // Initialize holes
+    initializeHoles();
+
+    // If the course has hole data, populate it
+    if (courseDetails.holes && courseDetails.holes.length > 0) {
+        courseDetails.holes.forEach(holeData => {
+            const holeIndex = holeData.number - 1;
+            if (holeIndex >= 0 && holeIndex < 18) {
+                appData.holes[holeIndex].par = holeData.par || 4;
+                appData.holes[holeIndex].yardage = holeData.yardage || null;
+                appData.holes[holeIndex].handicap = holeData.handicap || null;
+            }
+        });
+    }
+
+    // Now show setup screen to add players
+    courseNameInput.value = appData.courseName;
+    courseNameInput.disabled = true; // Course is locked from API
+    showScreen(setupScreen);
+}
+
+// Manual course entry
+manualCourseBtn.addEventListener('click', () => {
+    courseNameInput.disabled = false;
+    courseNameInput.value = '';
+    appData.courseId = null;
+    appData.courseCity = '';
+    appData.courseState = '';
+    showScreen(setupScreen);
+});
 
 // ===================================
 // SETUP SCREEN FUNCTIONALITY
@@ -114,8 +358,10 @@ startRoundBtn.addEventListener('click', () => {
     appData.players = players;
     appData.currentHole = 1;
 
-    // Initialize holes with default par values
-    initializeHoles();
+    // If holes weren't initialized yet (manual entry), initialize them
+    if (appData.holes.length === 0) {
+        initializeHoles();
+    }
 
     // Initialize scores for each player
     appData.players.forEach(player => {
@@ -146,7 +392,7 @@ startRoundBtn.addEventListener('click', () => {
     showScreen(scoreScreen);
 
     // Save to localStorage
-    saveToLocalStorage();
+    saveCurrentRound();
 });
 
 // ===================================
@@ -157,8 +403,28 @@ startRoundBtn.addEventListener('click', () => {
 function buildPlayerScoreCards() {
     playersScoreContainer.innerHTML = '';
 
+    const currentHoleData = appData.holes[appData.currentHole - 1];
+
+    // Display hole information if available
+    let holeInfoHTML = '';
+    if (currentHoleData.yardage || currentHoleData.handicap) {
+        holeInfoHTML = '<div class="hole-details" style="background: #f0f0f0; padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center;">';
+        if (currentHoleData.yardage) {
+            holeInfoHTML += `<span style="margin-right: 16px;">📏 ${currentHoleData.yardage} yards</span>`;
+        }
+        if (currentHoleData.handicap) {
+            holeInfoHTML += `<span>⚡ Handicap ${currentHoleData.handicap}</span>`;
+        }
+        holeInfoHTML += '</div>';
+    }
+
+    if (holeInfoHTML) {
+        const holeInfoDiv = document.createElement('div');
+        holeInfoDiv.innerHTML = holeInfoHTML;
+        playersScoreContainer.appendChild(holeInfoDiv.firstChild);
+    }
+
     appData.players.forEach(playerName => {
-        const currentHoleData = appData.holes[appData.currentHole - 1];
         const playerScore = currentHoleData.scores[playerName];
 
         const playerCard = document.createElement('div');
@@ -231,7 +497,7 @@ function changeScore(playerName, type, delta) {
     }
 
     // Save to localStorage
-    saveToLocalStorage();
+    saveCurrentRound();
 }
 
 // Calculate total strokes for a player across all holes played so far
@@ -239,6 +505,17 @@ function calculatePlayerTotal(playerName) {
     let total = 0;
     for (let i = 0; i < appData.currentHole; i++) {
         total += appData.holes[i].scores[playerName].strokes;
+    }
+    return total;
+}
+
+// Calculate total putts for a player
+function calculatePlayerTotalPutts(playerName) {
+    let total = 0;
+    for (let i = 0; i < 18; i++) {
+        if (appData.holes[i].scores[playerName]) {
+            total += appData.holes[i].scores[playerName].putts;
+        }
     }
     return total;
 }
@@ -256,7 +533,7 @@ function calculateVsPar(playerName) {
     return totalStrokes - totalPar;
 }
 
-// Get formatted display for vs par (e.g., "E" for even, "+2" for over, "-3" for under)
+// Get formatted display for vs par
 function getVsParDisplay(playerName) {
     const vsPar = calculateVsPar(playerName);
     if (vsPar === 0) return 'E';
@@ -288,19 +565,21 @@ document.querySelectorAll('.par-btn').forEach(btn => {
         // Update all player displays (in case vs par changed)
         appData.players.forEach(playerName => {
             const vsParElement = document.getElementById(`vspar-${playerName}`);
-            vsParElement.textContent = getVsParDisplay(playerName);
+            if (vsParElement) {
+                vsParElement.textContent = getVsParDisplay(playerName);
 
-            const vsParValue = calculateVsPar(playerName);
-            vsParElement.className = 'stat-value';
-            if (vsParValue < 0) {
-                vsParElement.classList.add('under-par');
-            } else if (vsParValue > 0) {
-                vsParElement.classList.add('over-par');
+                const vsParValue = calculateVsPar(playerName);
+                vsParElement.className = 'stat-value';
+                if (vsParValue < 0) {
+                    vsParElement.classList.add('under-par');
+                } else if (vsParValue > 0) {
+                    vsParElement.classList.add('over-par');
+                }
             }
         });
 
         // Save to localStorage
-        saveToLocalStorage();
+        saveCurrentRound();
     });
 });
 
@@ -348,7 +627,7 @@ function generateScorecard() {
     for (let i = 1; i <= 18; i++) {
         html += `<th>${i}</th>`;
     }
-    html += '<th class="total-col">Total</th><th class="total-col">vs Par</th></tr>';
+    html += '<th class="total-col">Total</th><th class="total-col">Putts</th><th class="total-col">vs Par</th></tr>';
 
     // Par row
     html += '<tr><td class="player-name">Par</td>';
@@ -357,16 +636,19 @@ function generateScorecard() {
         html += `<td>${hole.par}</td>`;
         totalPar += hole.par;
     });
-    html += `<td class="total-col">${totalPar}</td><td class="total-col">-</td></tr>`;
+    html += `<td class="total-col">${totalPar}</td><td class="total-col">-</td><td class="total-col">-</td></tr>`;
 
     // Player rows
     appData.players.forEach(playerName => {
         html += `<tr><td class="player-name">${playerName}</td>`;
         let playerTotal = 0;
+        let playerTotalPutts = 0;
 
         appData.holes.forEach(hole => {
             const score = hole.scores[playerName].strokes;
+            const putts = hole.scores[playerName].putts;
             playerTotal += score;
+            playerTotalPutts += putts;
 
             // Color code the score based on par
             let cellClass = '';
@@ -381,6 +663,7 @@ function generateScorecard() {
         const vsParColor = vsPar < 0 ? '#22c55e' : (vsPar > 0 ? '#ef4444' : '#333');
 
         html += `<td class="total-col">${playerTotal}</td>`;
+        html += `<td class="total-col">${playerTotalPutts}</td>`;
         html += `<td class="total-col" style="color: ${vsParColor}; font-weight: bold;">${vsParDisplay}</td>`;
         html += '</tr>';
     });
@@ -390,68 +673,422 @@ function generateScorecard() {
 }
 
 // ===================================
+// SAVE & FINISH ROUND
+// ===================================
+
+saveFinishBtn.addEventListener('click', () => {
+    const confirmFinish = confirm('Save and finish this round?');
+    if (confirmFinish) {
+        saveRoundToHistory();
+
+        // Reset the app for new round
+        courseNameInput.value = '';
+        courseNameInput.disabled = false;
+        roundDateInput.valueAsDate = new Date();
+        playersList.innerHTML = '<input type="text" class="player-input" placeholder="Player 1" required>';
+
+        appData = {
+            courseName: '',
+            courseId: null,
+            courseCity: '',
+            courseState: '',
+            roundDate: '',
+            players: [],
+            currentHole: 1,
+            holes: []
+        };
+
+        localStorage.removeItem('currentRound');
+
+        // Show history screen
+        displayHistory();
+        showScreen(historyScreen);
+
+        alert('Round saved! Great game! 🏌️');
+    }
+});
+
+// ===================================
+// ROUND HISTORY
+// ===================================
+
+function saveRoundToHistory() {
+    // Get existing history
+    const history = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+
+    // Add current round to history
+    const roundData = {
+        id: Date.now(), // Unique ID for this round
+        courseName: appData.courseName,
+        courseCity: appData.courseCity,
+        courseState: appData.courseState,
+        date: appData.roundDate,
+        players: appData.players,
+        holes: appData.holes,
+        savedAt: new Date().toISOString()
+    };
+
+    history.unshift(roundData); // Add to beginning (newest first)
+
+    // Save to localStorage
+    localStorage.setItem('roundHistory', JSON.stringify(history));
+
+    // Update player statistics
+    updatePlayerStatistics(roundData);
+}
+
+function displayHistory() {
+    const history = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+
+    if (history.length === 0) {
+        historyList.innerHTML = `
+            <div class="empty-history">
+                <p>📊 No rounds played yet</p>
+                <p style="font-size: 14px;">Start your first round to begin tracking your golf history!</p>
+            </div>
+        `;
+        return;
+    }
+
+    historyList.innerHTML = '';
+
+    history.forEach(round => {
+        const roundDiv = document.createElement('div');
+        roundDiv.className = 'history-item';
+
+        const roundDate = new Date(round.date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        let playersHTML = '<div class="history-players">';
+        let totalPar = round.holes.reduce((sum, hole) => sum + hole.par, 0);
+
+        round.players.forEach(playerName => {
+            let playerTotal = 0;
+            round.holes.forEach(hole => {
+                playerTotal += hole.scores[playerName].strokes;
+            });
+            const vsPar = playerTotal - totalPar;
+            const vsParDisplay = vsPar === 0 ? 'E' : (vsPar > 0 ? `+${vsPar}` : `${vsPar}`);
+
+            playersHTML += `
+                <div class="player-score-badge">
+                    <span class="player-name">${playerName}:</span>
+                    <span class="score">${playerTotal} (${vsParDisplay})</span>
+                </div>
+            `;
+        });
+        playersHTML += '</div>';
+
+        roundDiv.innerHTML = `
+            <h3>${round.courseName}</h3>
+            <div class="history-date">📅 ${roundDate}</div>
+            ${playersHTML}
+        `;
+
+        roundDiv.addEventListener('click', () => showRoundDetail(round));
+        historyList.appendChild(roundDiv);
+    });
+}
+
+function showRoundDetail(round) {
+    detailCourseName.textContent = round.courseName;
+    detailRoundDate.textContent = new Date(round.date).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    // Generate detailed scorecard
+    let html = '<table class="scorecard-table">';
+
+    // Header
+    html += '<tr><th>Hole</th>';
+    for (let i = 1; i <= 18; i++) {
+        html += `<th>${i}</th>`;
+    }
+    html += '<th class="total-col">Total</th><th class="total-col">Putts</th><th class="total-col">vs Par</th></tr>';
+
+    // Par row
+    html += '<tr><td class="player-name">Par</td>';
+    let totalPar = 0;
+    round.holes.forEach(hole => {
+        html += `<td>${hole.par}</td>`;
+        totalPar += hole.par;
+    });
+    html += `<td class="total-col">${totalPar}</td><td class="total-col">-</td><td class="total-col">-</td></tr>`;
+
+    // Player rows
+    round.players.forEach(playerName => {
+        html += `<tr><td class="player-name">${playerName}</td>`;
+        let playerTotal = 0;
+        let playerTotalPutts = 0;
+
+        round.holes.forEach(hole => {
+            const score = hole.scores[playerName].strokes;
+            const putts = hole.scores[playerName].putts;
+            playerTotal += score;
+            playerTotalPutts += putts;
+
+            let cellClass = '';
+            if (score < hole.par) cellClass = 'style="color: #22c55e; font-weight: bold;"';
+            else if (score > hole.par) cellClass = 'style="color: #ef4444; font-weight: bold;"';
+
+            html += `<td ${cellClass}>${score}</td>`;
+        });
+
+        const vsPar = playerTotal - totalPar;
+        const vsParDisplay = vsPar === 0 ? 'E' : (vsPar > 0 ? `+${vsPar}` : `${vsPar}`);
+        const vsParColor = vsPar < 0 ? '#22c55e' : (vsPar > 0 ? '#ef4444' : '#333');
+
+        html += `<td class="total-col">${playerTotal}</td>`;
+        html += `<td class="total-col">${playerTotalPutts}</td>`;
+        html += `<td class="total-col" style="color: ${vsParColor}; font-weight: bold;">${vsParDisplay}</td>`;
+        html += '</tr>';
+    });
+
+    html += '</table>';
+    detailScorecard.innerHTML = html;
+
+    showScreen(roundDetailScreen);
+}
+
+backToHistoryBtn.addEventListener('click', () => {
+    displayHistory();
+    showScreen(historyScreen);
+});
+
+startNewRoundBtn.addEventListener('click', () => {
+    showScreen(courseSearchScreen);
+});
+
+// ===================================
+// PLAYER STATISTICS
+// ===================================
+
+function updatePlayerStatistics(round) {
+    const stats = JSON.parse(localStorage.getItem('playerStats') || '{}');
+
+    let totalPar = round.holes.reduce((sum, hole) => sum + hole.par, 0);
+
+    round.players.forEach(playerName => {
+        if (!stats[playerName]) {
+            stats[playerName] = {
+                roundsPlayed: 0,
+                totalScore: 0,
+                totalVsPar: 0,
+                lowestScore: Infinity,
+                highestScore: -Infinity,
+                totalPutts: 0,
+                courseStats: {} // Track stats by course
+            };
+        }
+
+        // Calculate this round's stats
+        let playerTotal = 0;
+        let playerPutts = 0;
+        round.holes.forEach(hole => {
+            playerTotal += hole.scores[playerName].strokes;
+            playerPutts += hole.scores[playerName].putts;
+        });
+
+        const vsPar = playerTotal - totalPar;
+
+        // Update player stats
+        stats[playerName].roundsPlayed++;
+        stats[playerName].totalScore += playerTotal;
+        stats[playerName].totalVsPar += vsPar;
+        stats[playerName].lowestScore = Math.min(stats[playerName].lowestScore, playerTotal);
+        stats[playerName].highestScore = Math.max(stats[playerName].highestScore, playerTotal);
+        stats[playerName].totalPutts += playerPutts;
+
+        // Update course-specific stats
+        const courseName = round.courseName;
+        if (!stats[playerName].courseStats[courseName]) {
+            stats[playerName].courseStats[courseName] = {
+                rounds: 0,
+                totalScore: 0,
+                lowestScore: Infinity
+            };
+        }
+        stats[playerName].courseStats[courseName].rounds++;
+        stats[playerName].courseStats[courseName].totalScore += playerTotal;
+        stats[playerName].courseStats[courseName].lowestScore = Math.min(
+            stats[playerName].courseStats[courseName].lowestScore,
+            playerTotal
+        );
+    });
+
+    localStorage.setItem('playerStats', JSON.stringify(stats));
+}
+
+function displayPlayerStats() {
+    const stats = JSON.parse(localStorage.getItem('playerStats') || '{}');
+    const playerNames = Object.keys(stats);
+
+    if (playerNames.length === 0) {
+        playerStatsList.innerHTML = `
+            <div class="empty-history">
+                <p>👤 No player statistics yet</p>
+                <p style="font-size: 14px;">Play some rounds to start tracking your stats!</p>
+            </div>
+        `;
+        return;
+    }
+
+    playerStatsList.innerHTML = '';
+
+    playerNames.forEach(playerName => {
+        const playerStats = stats[playerName];
+        const avgScore = (playerStats.totalScore / playerStats.roundsPlayed).toFixed(1);
+        const avgVsPar = (playerStats.totalVsPar / playerStats.roundsPlayed).toFixed(1);
+        const avgPutts = (playerStats.totalPutts / playerStats.roundsPlayed).toFixed(1);
+
+        const playerDiv = document.createElement('div');
+        playerDiv.className = 'player-stats-item';
+
+        playerDiv.innerHTML = `
+            <h3>${playerName}</h3>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Rounds Played</div>
+                    <div class="stat-value">${playerStats.roundsPlayed}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Avg Score</div>
+                    <div class="stat-value">${avgScore}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Avg vs Par</div>
+                    <div class="stat-value ${parseFloat(avgVsPar) < 0 ? 'positive' : 'negative'}">${avgVsPar > 0 ? '+' : ''}${avgVsPar}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Best Round</div>
+                    <div class="stat-value positive">${playerStats.lowestScore}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Worst Round</div>
+                    <div class="stat-value negative">${playerStats.highestScore}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Avg Putts</div>
+                    <div class="stat-value">${avgPutts}</div>
+                </div>
+            </div>
+        `;
+
+        playerDiv.addEventListener('click', () => showPlayerDetail(playerName, playerStats));
+        playerStatsList.appendChild(playerDiv);
+    });
+}
+
+function showPlayerDetail(playerName, playerStats) {
+    playerDetailName.textContent = playerName;
+
+    const avgScore = (playerStats.totalScore / playerStats.roundsPlayed).toFixed(1);
+    const avgVsPar = (playerStats.totalVsPar / playerStats.roundsPlayed).toFixed(1);
+    const avgPutts = (playerStats.totalPutts / playerStats.roundsPlayed).toFixed(1);
+
+    let html = `
+        <div class="stats-section">
+            <h3>📊 Overall Statistics</h3>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Total Rounds</div>
+                    <div class="stat-value">${playerStats.roundsPlayed}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Average Score</div>
+                    <div class="stat-value">${avgScore}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Average vs Par</div>
+                    <div class="stat-value ${parseFloat(avgVsPar) < 0 ? 'positive' : 'negative'}">${avgVsPar > 0 ? '+' : ''}${avgVsPar}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Best Round</div>
+                    <div class="stat-value positive">${playerStats.lowestScore}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Worst Round</div>
+                    <div class="stat-value negative">${playerStats.highestScore}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Average Putts/Round</div>
+                    <div class="stat-value">${avgPutts}</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Find best course
+    const courseNames = Object.keys(playerStats.courseStats);
+    if (courseNames.length > 0) {
+        html += `
+            <div class="stats-section">
+                <h3>🏌️ Performance by Course</h3>
+        `;
+
+        courseNames.forEach(courseName => {
+            const courseData = playerStats.courseStats[courseName];
+            const courseAvg = (courseData.totalScore / courseData.rounds).toFixed(1);
+
+            html += `
+                <div class="course-breakdown">
+                    <h4>${courseName}</h4>
+                    <p>Rounds played: ${courseData.rounds}</p>
+                    <p>Average score: ${courseAvg}</p>
+                    <p>Best score: ${courseData.lowestScore}</p>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+    }
+
+    playerDetailStats.innerHTML = html;
+    showScreen(playerDetailScreen);
+}
+
+backToStatsBtn.addEventListener('click', () => {
+    displayPlayerStats();
+    showScreen(statsScreen);
+});
+
+// ===================================
 // LOCAL STORAGE
 // ===================================
 
-function saveToLocalStorage() {
-    localStorage.setItem('golfAppData', JSON.stringify(appData));
+function saveCurrentRound() {
+    localStorage.setItem('currentRound', JSON.stringify(appData));
 }
 
-function loadFromLocalStorage() {
-    const savedData = localStorage.getItem('golfAppData');
+function loadCurrentRound() {
+    const savedData = localStorage.getItem('currentRound');
     if (savedData) {
         appData = JSON.parse(savedData);
 
-        // If there's saved data, offer to continue
-        if (appData.courseName && appData.players.length > 0) {
-            const continueRound = confirm(`Continue your round at ${appData.courseName}?`);
-            if (continueRound) {
-                // Restore the score screen
-                courseNameDisplay.textContent = appData.courseName;
-                roundDateDisplay.textContent = new Date(appData.roundDate).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-                buildPlayerScoreCards();
-                updateHoleNavigation();
-                showScreen(scoreScreen);
-            } else {
-                // Reset for new round
-                initializeHoles();
-            }
-        }
-    } else {
-        initializeHoles();
+        // Restore the score screen
+        courseNameDisplay.textContent = appData.courseName;
+        roundDateDisplay.textContent = new Date(appData.roundDate).toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        buildPlayerScoreCards();
+        updateHoleNavigation();
     }
 }
 
 // Back button - confirm before leaving
 backBtn.addEventListener('click', () => {
-    const confirmLeave = confirm('Return to setup? Your progress will be saved.');
+    const confirmLeave = confirm('Return to main menu? Your progress will be saved.');
     if (confirmLeave) {
-        showScreen(setupScreen);
-    }
-});
-
-// Finish round
-finishRoundBtn.addEventListener('click', () => {
-    const confirmFinish = confirm('Finish this round? The scorecard will be cleared.');
-    if (confirmFinish) {
-        // TODO: In the future, save completed rounds to a history
-        localStorage.removeItem('golfAppData');
-
-        // Reset the app
-        courseNameInput.value = '';
-        roundDateInput.valueAsDate = new Date();
-        playersList.innerHTML = '<input type="text" class="player-input" placeholder="Player 1" required>';
-
-        initializeHoles();
-
-        showScreen(setupScreen);
-
-        alert('Round completed! Great game! 🏌️');
+        showScreen(courseSearchScreen);
     }
 });
 
@@ -459,5 +1096,18 @@ finishRoundBtn.addEventListener('click', () => {
 // APP STARTUP
 // ===================================
 
-// Load any saved data when the app starts
-loadFromLocalStorage();
+// Check if there's a current round in progress
+const savedRound = localStorage.getItem('currentRound');
+if (savedRound) {
+    const continueRound = confirm('You have a round in progress. Continue?');
+    if (continueRound) {
+        loadCurrentRound();
+        showScreen(scoreScreen);
+    } else {
+        // Show course search for new round
+        showScreen(courseSearchScreen);
+    }
+} else {
+    // No round in progress - show course search
+    showScreen(courseSearchScreen);
+}
