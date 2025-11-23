@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golf Score Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Main container for the entire app -->
+    <div class="app-container">
+
+        <!-- SCREEN 1: Setup New Round -->
+        <div id="setupScreen" class="screen active">
+            <h1>🏌️ Golf Score Tracker</h1>
+
+            <div class="setup-form">
+                <div class="form-group">
+                    <label for="courseName">Course Name</label>
+                    <input type="text" id="courseName" placeholder="Enter course name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="roundDate">Date</label>
+                    <input type="date" id="roundDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Players</label>
+                    <div id="playersList">
+                        <input type="text" class="player-input" placeholder="Player 1" required>
+                    </div>
+                    <button type="button" class="btn-secondary" id="addPlayerBtn">+ Add Player</button>
+                </div>
+
+                <button class="btn-primary" id="startRoundBtn">Start Round</button>
+            </div>
+        </div>
+
+        <!-- SCREEN 2: Score Entry -->
+        <div id="scoreScreen" class="screen">
+            <div class="score-header">
+                <button class="btn-back" id="backBtn">← Back</button>
+                <div class="round-info">
+                    <h2 id="courseNameDisplay"></h2>
+                    <p id="roundDateDisplay"></p>
+                </div>
+            </div>
+
+            <div class="hole-navigation">
+                <button class="btn-nav" id="prevHoleBtn">← Prev</button>
+                <h2 id="currentHoleDisplay">Hole 1</h2>
+                <button class="btn-nav" id="nextHoleBtn">Next →</button>
+            </div>
+
+            <div class="hole-info">
+                <div class="par-selector">
+                    <label>Par:</label>
+                    <div class="par-buttons">
+                        <button class="par-btn" data-par="3">3</button>
+                        <button class="par-btn active" data-par="4">4</button>
+                        <button class="par-btn" data-par="5">5</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="playersScoreContainer" class="players-score-container">
+                <!-- Player score cards will be added here dynamically -->
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-secondary" id="viewScoresBtn">View Scorecard</button>
+            </div>
+        </div>
+
+        <!-- SCREEN 3: Scorecard View -->
+        <div id="scorecardScreen" class="screen">
+            <div class="score-header">
+                <button class="btn-back" id="backToScoreBtn">← Back to Scoring</button>
+                <h2>Scorecard</h2>
+            </div>
+
+            <div id="scorecardContainer" class="scorecard-container">
+                <!-- Scorecard table will be generated here -->
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-primary" id="finishRoundBtn">Finish Round</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
