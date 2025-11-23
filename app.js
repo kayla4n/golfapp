@@ -7,6 +7,49 @@ const GOLF_API_KEY = '274CKOV66N2XQTKWVD4EDPBIYM';
 const GOLF_API_BASE = 'https://api.golfcourseapi.com';
 
 // ===================================
+// STORAGE UTILITIES
+// ===================================
+
+// Calculate localStorage usage
+function getStorageUsage() {
+    let totalSize = 0;
+    for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+            totalSize += localStorage[key].length + key.length;
+        }
+    }
+    // Convert to KB
+    const sizeInKB = (totalSize / 1024).toFixed(2);
+    const estimatedQuota = 5000; // ~5MB typical quota for localStorage
+    const percentage = ((totalSize / 1024) / estimatedQuota * 100).toFixed(1);
+
+    return {
+        usedKB: parseFloat(sizeInKB),
+        totalKB: estimatedQuota,
+        percentage: parseFloat(percentage)
+    };
+}
+
+// Get storage statistics
+function getStorageStats() {
+    const history = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+    const stats = {
+        roundCount: history.length,
+        oldestRound: null,
+        newestRound: null,
+        lastBackupDate: localStorage.getItem('lastBackupDate') || null
+    };
+
+    if (history.length > 0) {
+        const sortedByDate = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
+        stats.oldestRound = sortedByDate[0].date;
+        stats.newestRound = sortedByDate[sortedByDate.length - 1].date;
+    }
+
+    return stats;
+}
+
+// ===================================
 // DATA STRUCTURE
 // ===================================
 
@@ -95,6 +138,21 @@ const backToStatsBtn = document.getElementById('backToStatsBtn');
 const playerDetailName = document.getElementById('playerDetailName');
 const playerDetailStats = document.getElementById('playerDetailStats');
 
+// Backup & Restore Screen
+const backupRestoreScreen = document.getElementById('backupRestoreScreen');
+const storageInfoDisplay = document.getElementById('storageInfoDisplay');
+const exportAllDataBtn = document.getElementById('exportAllDataBtn');
+const exportLast30DaysBtn = document.getElementById('exportLast30DaysBtn');
+const exportSelectedBtn = document.getElementById('exportSelectedBtn');
+const exportCsvBtn = document.getElementById('exportCsvBtn');
+const importDataBtn = document.getElementById('importDataBtn');
+const importFileInput = document.getElementById('importFileInput');
+const importStatus = document.getElementById('importStatus');
+const navBackupRestore = document.getElementById('navBackupRestore');
+
+// Storage Warning Banner
+const storageWarningBanner = document.getElementById('storageWarningBanner');
+
 // ===================================
 // INITIALIZATION
 // ===================================
@@ -163,6 +221,13 @@ navPlayerStats.addEventListener('click', (e) => {
     closeSidebar();
     displayPlayerStats();
     showScreen(statsScreen);
+});
+
+navBackupRestore.addEventListener('click', (e) => {
+    e.preventDefault();
+    closeSidebar();
+    displayBackupRestore();
+    showScreen(backupRestoreScreen);
 });
 
 // ===================================
@@ -919,19 +984,50 @@ saveFinishBtn.addEventListener('click', () => {
 // ===================================
 
 function saveRoundToHistory() {
-    // Get existing history
-    const history = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+    try {
+        // Get existing history
+        const history = JSON.parse(localStorage.getItem('roundHistory') || '[]');
 
-    // Check if we're editing an existing round
-    if (appData.editingRoundId) {
-        console.log('💾 Updating existing round:', appData.editingRoundId);
+        // Check if we're editing an existing round
+        if (appData.editingRoundId) {
+            console.log('💾 Updating existing round:', appData.editingRoundId);
 
-        // Find and update the existing round
-        const roundIndex = history.findIndex(r => r.id === appData.editingRoundId);
-        if (roundIndex !== -1) {
-            // Update the round data while keeping the original ID and savedAt
-            history[roundIndex] = {
-                id: appData.editingRoundId,
+            // Find and update the existing round
+            const roundIndex = history.findIndex(r => r.id === appData.editingRoundId);
+            if (roundIndex !== -1) {
+                // Update the round data while keeping the original ID and savedAt
+                history[roundIndex] = {
+                    id: appData.editingRoundId,
+                    courseName: appData.courseName,
+                    courseCity: appData.courseCity,
+                    courseState: appData.courseState,
+                    date: appData.roundDate,
+                    players: appData.players,
+                    holes: appData.holes,
+                    tees: appData.tees || [],
+                    savedAt: history[roundIndex].savedAt, // Keep original save time
+                    updatedAt: new Date().toISOString()
+                };
+
+                // Save updated history
+                localStorage.setItem('roundHistory', JSON.stringify(history));
+
+                // Recalculate ALL player statistics from scratch
+                recalculateAllPlayerStats(history);
+
+                console.log('✅ Round updated successfully');
+            } else {
+                console.error('❌ Could not find round to update');
+            }
+
+            // Clear the editing flag
+            delete appData.editingRoundId;
+        } else {
+            console.log('💾 Saving new round to history');
+
+            // Add new round to history
+            const roundData = {
+                id: Date.now(), // Unique ID for this round
                 courseName: appData.courseName,
                 courseCity: appData.courseCity,
                 courseState: appData.courseState,
@@ -939,48 +1035,32 @@ function saveRoundToHistory() {
                 players: appData.players,
                 holes: appData.holes,
                 tees: appData.tees || [],
-                savedAt: history[roundIndex].savedAt, // Keep original save time
-                updatedAt: new Date().toISOString()
+                savedAt: new Date().toISOString()
             };
 
-            // Save updated history
+            history.unshift(roundData); // Add to beginning (newest first)
+
+            // Save to localStorage
             localStorage.setItem('roundHistory', JSON.stringify(history));
 
-            // Recalculate ALL player statistics from scratch
-            recalculateAllPlayerStats(history);
+            // Update player statistics
+            updatePlayerStatistics(roundData);
 
-            console.log('✅ Round updated successfully');
-        } else {
-            console.error('❌ Could not find round to update');
+            console.log('✅ New round saved successfully');
         }
 
-        // Clear the editing flag
-        delete appData.editingRoundId;
-    } else {
-        console.log('💾 Saving new round to history');
+        // Check storage after saving
+        checkStorageAndShowWarning();
 
-        // Add new round to history
-        const roundData = {
-            id: Date.now(), // Unique ID for this round
-            courseName: appData.courseName,
-            courseCity: appData.courseCity,
-            courseState: appData.courseState,
-            date: appData.roundDate,
-            players: appData.players,
-            holes: appData.holes,
-            tees: appData.tees || [],
-            savedAt: new Date().toISOString()
-        };
-
-        history.unshift(roundData); // Add to beginning (newest first)
-
-        // Save to localStorage
-        localStorage.setItem('roundHistory', JSON.stringify(history));
-
-        // Update player statistics
-        updatePlayerStatistics(roundData);
-
-        console.log('✅ New round saved successfully');
+    } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            alert('❌ Cannot save - storage full! Please export and delete old rounds.');
+            showStorageWarning('critical', 100);
+            navigateToBackup();
+        } else {
+            console.error('Error saving round to history:', e);
+            alert('❌ Error saving round. Please try again.');
+        }
     }
 }
 
@@ -1534,7 +1614,18 @@ function recalculateAllPlayerStats(history) {
 // ===================================
 
 function saveCurrentRound() {
-    localStorage.setItem('currentRound', JSON.stringify(appData));
+    try {
+        localStorage.setItem('currentRound', JSON.stringify(appData));
+        checkStorageAndShowWarning();
+    } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            alert('❌ Cannot save - storage full! Please export and delete old rounds.');
+            showStorageWarning('critical', 100);
+        } else {
+            console.error('Error saving round:', e);
+            alert('❌ Error saving round. Please try again.');
+        }
+    }
 }
 
 function loadCurrentRound() {
@@ -1564,8 +1655,377 @@ backBtn.addEventListener('click', () => {
 });
 
 // ===================================
+// STORAGE WARNING BANNER
+// ===================================
+
+function checkStorageAndShowWarning() {
+    const usage = getStorageUsage();
+    console.log('📊 Storage check:', usage);
+
+    if (usage.percentage > 95) {
+        showStorageWarning('critical', usage.percentage);
+    } else if (usage.percentage > 80) {
+        showStorageWarning('warning', usage.percentage);
+    } else {
+        hideStorageWarning();
+    }
+
+    // Check for 30-day backup reminder
+    checkBackupReminder();
+}
+
+function showStorageWarning(level, percentage) {
+    const banner = storageWarningBanner;
+    let message = '';
+    let backgroundColor = '';
+
+    if (level === 'critical') {
+        message = `🚨 Storage critically full (${percentage}% used)! Export now to prevent data loss.`;
+        backgroundColor = '#fee2e2'; // red background
+    } else if (level === 'warning') {
+        message = `⚠️ Storage almost full (${percentage}% used). Export your data to back it up!`;
+        backgroundColor = '#fef3c7'; // yellow background
+    }
+
+    banner.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: ${backgroundColor}; border-bottom: 2px solid ${level === 'critical' ? '#ef4444' : '#eab308'};">
+            <span style="flex: 1; font-weight: 500;">${message}</span>
+            <button onclick="navigateToBackup()" style="margin-left: 12px; padding: 8px 16px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; min-height: 48px;">
+                Export Data
+            </button>
+        </div>
+    `;
+    banner.style.display = 'block';
+}
+
+function hideStorageWarning() {
+    storageWarningBanner.style.display = 'none';
+}
+
+function navigateToBackup() {
+    displayBackupRestore();
+    showScreen(backupRestoreScreen);
+}
+
+function checkBackupReminder() {
+    const lastBackup = localStorage.getItem('lastBackupDate');
+    if (!lastBackup) {
+        return; // Don't show reminder if they've never backed up
+    }
+
+    const daysSinceBackup = (Date.now() - new Date(lastBackup)) / (1000 * 60 * 60 * 24);
+    if (daysSinceBackup > 30) {
+        // Show gentle reminder (only if no critical warning is showing)
+        const usage = getStorageUsage();
+        if (usage.percentage <= 80) {
+            const banner = storageWarningBanner;
+            banner.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #dbeafe; border-bottom: 2px solid #3b82f6;">
+                    <span style="flex: 1; font-weight: 500;">💡 Tip: Back up your data regularly! Last backup was ${Math.floor(daysSinceBackup)} days ago.</span>
+                    <button onclick="navigateToBackup()" style="margin-left: 12px; padding: 8px 16px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-weight: 500; cursor: pointer; min-height: 48px;">
+                        Backup Now
+                    </button>
+                </div>
+            `;
+            banner.style.display = 'block';
+        }
+    }
+}
+
+// ===================================
+// BACKUP & RESTORE
+// ===================================
+
+function displayBackupRestore() {
+    const usage = getStorageUsage();
+    const stats = getStorageStats();
+
+    // Determine progress bar color
+    let barColor = '#22c55e'; // green
+    if (usage.percentage >= 80) {
+        barColor = '#ef4444'; // red
+    } else if (usage.percentage >= 50) {
+        barColor = '#eab308'; // yellow
+    }
+
+    let html = `
+        <div class="storage-bar-container" style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-weight: 600; color: #333;">Storage Usage</span>
+                <span style="font-weight: 700; font-size: 18px; color: ${barColor};">${usage.percentage}%</span>
+            </div>
+            <div style="width: 100%; height: 24px; background: #e5e7eb; border-radius: 12px; overflow: hidden;">
+                <div style="width: ${usage.percentage}%; height: 100%; background: ${barColor}; transition: width 0.3s ease;"></div>
+            </div>
+            <div style="margin-top: 8px; font-size: 14px; color: #666;">
+                Using ${usage.usedKB} KB of ~${usage.totalKB} KB available
+            </div>
+        </div>
+
+        <div class="storage-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+            <div class="stat-box">
+                <div class="stat-label">Rounds Stored</div>
+                <div class="stat-value">${stats.roundCount}</div>
+            </div>
+    `;
+
+    if (stats.oldestRound) {
+        html += `
+            <div class="stat-box">
+                <div class="stat-label">Oldest Round</div>
+                <div class="stat-value" style="font-size: 14px;">${new Date(stats.oldestRound).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+            </div>
+        `;
+    }
+
+    if (stats.newestRound) {
+        html += `
+            <div class="stat-box">
+                <div class="stat-label">Newest Round</div>
+                <div class="stat-value" style="font-size: 14px;">${new Date(stats.newestRound).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+            </div>
+        `;
+    }
+
+    if (stats.lastBackupDate) {
+        html += `
+            <div class="stat-box">
+                <div class="stat-label">Last Export</div>
+                <div class="stat-value" style="font-size: 14px;">${new Date(stats.lastBackupDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+
+    storageInfoDisplay.innerHTML = html;
+}
+
+// Export all data
+exportAllDataBtn.addEventListener('click', () => {
+    const data = {
+        roundHistory: JSON.parse(localStorage.getItem('roundHistory') || '[]'),
+        playerStats: JSON.parse(localStorage.getItem('playerStats') || '{}'),
+        exportDate: new Date().toISOString(),
+        version: '1.0'
+    };
+
+    downloadJSON(data, `forescore-backup-${getDateString()}.json`);
+    localStorage.setItem('lastBackupDate', new Date().toISOString());
+    displayBackupRestore(); // Refresh display
+    alert('✅ All data exported successfully!');
+});
+
+// Export last 30 days
+exportLast30DaysBtn.addEventListener('click', () => {
+    const allRounds = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentRounds = allRounds.filter(round => new Date(round.date) >= thirtyDaysAgo);
+
+    if (recentRounds.length === 0) {
+        alert('No rounds found in the last 30 days.');
+        return;
+    }
+
+    const data = {
+        roundHistory: recentRounds,
+        exportDate: new Date().toISOString(),
+        version: '1.0',
+        note: 'Last 30 days export'
+    };
+
+    downloadJSON(data, `forescore-last30days-${getDateString()}.json`);
+    localStorage.setItem('lastBackupDate', new Date().toISOString());
+    displayBackupRestore(); // Refresh display
+    alert(`✅ Exported ${recentRounds.length} round(s) from the last 30 days!`);
+});
+
+// Export selected date range
+exportSelectedBtn.addEventListener('click', () => {
+    const startDate = prompt('Enter start date (YYYY-MM-DD):');
+    if (!startDate) return;
+
+    const endDate = prompt('Enter end date (YYYY-MM-DD):');
+    if (!endDate) return;
+
+    const allRounds = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        alert('Invalid date format. Please use YYYY-MM-DD.');
+        return;
+    }
+
+    const selectedRounds = allRounds.filter(round => {
+        const roundDate = new Date(round.date);
+        return roundDate >= start && roundDate <= end;
+    });
+
+    if (selectedRounds.length === 0) {
+        alert('No rounds found in the selected date range.');
+        return;
+    }
+
+    const data = {
+        roundHistory: selectedRounds,
+        exportDate: new Date().toISOString(),
+        version: '1.0',
+        note: `Date range: ${startDate} to ${endDate}`
+    };
+
+    downloadJSON(data, `forescore-custom-${getDateString()}.json`);
+    localStorage.setItem('lastBackupDate', new Date().toISOString());
+    displayBackupRestore(); // Refresh display
+    alert(`✅ Exported ${selectedRounds.length} round(s) from selected date range!`);
+});
+
+// Export to CSV
+exportCsvBtn.addEventListener('click', () => {
+    const allRounds = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+
+    if (allRounds.length === 0) {
+        alert('No rounds to export.');
+        return;
+    }
+
+    // CSV header
+    let csv = 'Date,Course,Player,Score,Putts,vs Par\n';
+
+    // Process each round
+    allRounds.forEach(round => {
+        const totalPar = round.holes.reduce((sum, hole) => sum + hole.par, 0);
+        const roundDate = new Date(round.date).toLocaleDateString('en-US');
+
+        round.players.forEach(playerName => {
+            let playerTotal = 0;
+            let playerPutts = 0;
+
+            round.holes.forEach(hole => {
+                playerTotal += hole.scores[playerName].strokes;
+                playerPutts += hole.scores[playerName].putts;
+            });
+
+            const vsPar = playerTotal - totalPar;
+            const vsParDisplay = vsPar === 0 ? 'E' : (vsPar > 0 ? `+${vsPar}` : `${vsPar}`);
+
+            // Escape course name in case it has commas
+            const escapedCourseName = `"${round.courseName.replace(/"/g, '""')}"`;
+
+            csv += `${roundDate},${escapedCourseName},${playerName},${playerTotal},${playerPutts},${vsParDisplay}\n`;
+        });
+    });
+
+    downloadCSV(csv, `forescore-rounds-${getDateString()}.csv`);
+    localStorage.setItem('lastBackupDate', new Date().toISOString());
+    displayBackupRestore(); // Refresh display
+    alert('✅ Data exported to CSV successfully!');
+});
+
+// Import data
+importDataBtn.addEventListener('click', () => {
+    importFileInput.click();
+});
+
+importFileInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const importedData = JSON.parse(e.target.result);
+
+            if (!importedData.roundHistory || !Array.isArray(importedData.roundHistory)) {
+                throw new Error('Invalid backup file format');
+            }
+
+            const existingRounds = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+            const existingIds = new Set(existingRounds.map(r => r.id));
+
+            let newRounds = 0;
+            let duplicates = 0;
+
+            importedData.roundHistory.forEach(round => {
+                if (!existingIds.has(round.id)) {
+                    existingRounds.push(round);
+                    newRounds++;
+                } else {
+                    duplicates++;
+                }
+            });
+
+            // Save updated rounds
+            localStorage.setItem('roundHistory', JSON.stringify(existingRounds));
+
+            // Recalculate player stats from all rounds
+            recalculateAllPlayerStats(existingRounds);
+
+            // Show status
+            let statusMessage = `✅ Import complete!\n${newRounds} new round(s) added.`;
+            if (duplicates > 0) {
+                statusMessage += `\n${duplicates} duplicate(s) skipped.`;
+            }
+
+            importStatus.innerHTML = `<p style="color: #22c55e; font-weight: 500;">${statusMessage.replace(/\n/g, '<br>')}</p>`;
+            alert(statusMessage);
+
+            // Refresh display
+            displayBackupRestore();
+
+            // Reset file input
+            importFileInput.value = '';
+
+        } catch (error) {
+            console.error('Import error:', error);
+            importStatus.innerHTML = `<p style="color: #ef4444; font-weight: 500;">❌ Error: Invalid backup file</p>`;
+            alert('❌ Error: Unable to import file. Please make sure it\'s a valid ForeScore backup file.');
+        }
+    };
+
+    reader.readAsText(file);
+});
+
+// Helper function to download JSON
+function downloadJSON(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Helper function to download CSV
+function downloadCSV(csv, filename) {
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Helper function to get date string for filenames
+function getDateString() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+// ===================================
 // APP STARTUP
 // ===================================
+
+// Check storage on app load
+checkStorageAndShowWarning();
 
 // Check if there's a current round in progress
 const savedRound = localStorage.getItem('currentRound');
