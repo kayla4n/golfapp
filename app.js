@@ -192,7 +192,7 @@ searchCoursesBtn.addEventListener('click', async () => {
 
     try {
         // Use the Golf Course API to search
-        const searchUrl = `${GOLF_API_BASE}/courses?name=${encodeURIComponent(query)}`;
+        const searchUrl = `${GOLF_API_BASE}/v1/search?search_query=${encodeURIComponent(query)}`;
         console.log('🏌️ Searching golf courses at:', searchUrl);
         console.log('🔑 Using authorization:', `Key ${GOLF_API_KEY}`);
 
@@ -206,12 +206,15 @@ searchCoursesBtn.addEventListener('click', async () => {
         console.log('📡 Response status:', response.status, response.statusText);
 
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ API Error Response:', errorText);
             throw new Error(`Failed to fetch courses: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
-        console.log('✅ Received data:', data);
-        displayCourseResults(data.courses || []);
+        console.log('✅ Received search data:', data);
+        // API returns array directly
+        displayCourseResults(Array.isArray(data) ? data : []);
 
     } catch (error) {
         console.error('Error searching courses:', error);
@@ -226,6 +229,8 @@ searchCoursesBtn.addEventListener('click', async () => {
 
 // Display course search results
 function displayCourseResults(courses) {
+    console.log('📋 Displaying', courses.length, 'course results');
+
     if (courses.length === 0) {
         searchResults.innerHTML = `
             <div class="empty-history">
@@ -236,21 +241,25 @@ function displayCourseResults(courses) {
         return;
     }
 
-    // Filter/prioritize California and Hawaii courses if possible
-    const priorityStates = ['CA', 'HI'];
-    const priorityCourses = courses.filter(c => priorityStates.includes(c.state));
-    const otherCourses = courses.filter(c => !priorityStates.includes(c.state));
-    const sortedCourses = [...priorityCourses, ...otherCourses];
-
     searchResults.innerHTML = '';
 
-    sortedCourses.forEach(course => {
+    courses.forEach(course => {
         const courseDiv = document.createElement('div');
         courseDiv.className = 'course-result';
+
+        // API returns club_name and course_name
+        const displayName = course.club_name && course.course_name
+            ? `${course.club_name} - ${course.course_name}`
+            : (course.club_name || course.course_name || course.name || 'Unknown Course');
+
+        // Location can be a string or object
+        const location = typeof course.location === 'string'
+            ? course.location
+            : (course.city && course.state ? `${course.city}, ${course.state}` : 'Location N/A');
+
         courseDiv.innerHTML = `
-            <h3>${course.name}</h3>
-            <p>📍 ${course.city}, ${course.state} ${course.zip || ''}</p>
-            ${course.phone ? `<p>📞 ${course.phone}</p>` : ''}
+            <h3>${displayName}</h3>
+            <p>📍 ${location}</p>
         `;
 
         courseDiv.addEventListener('click', () => selectCourse(course));
@@ -260,11 +269,12 @@ function displayCourseResults(courses) {
 
 // When a course is selected, fetch its hole details
 async function selectCourse(course) {
+    console.log('🎯 Selected course:', course);
     searchResults.innerHTML = '<div class="loading-spinner">📊 Loading course details...</div>';
 
     try {
         // Fetch course details including holes
-        const detailUrl = `${GOLF_API_BASE}/courses/${course.id}`;
+        const detailUrl = `${GOLF_API_BASE}/v1/courses/${course.id}`;
         console.log('📊 Fetching course details from:', detailUrl);
         console.log('🔑 Using authorization:', `Key ${GOLF_API_KEY}`);
 
@@ -278,34 +288,66 @@ async function selectCourse(course) {
         console.log('📡 Response status:', response.status, response.statusText);
 
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ API Error Response:', errorText);
             throw new Error(`Failed to fetch course details: ${response.status} ${response.statusText}`);
         }
 
         const courseDetails = await response.json();
         console.log('✅ Received course details:', courseDetails);
-        setupRoundWithCourse(courseDetails);
+        setupRoundWithCourse(courseDetails, course);
 
     } catch (error) {
-        console.error('Error fetching course details:', error);
+        console.error('❌ Error fetching course details:', error);
         alert('Unable to load course details. You can still enter the course manually.');
         showScreen(setupScreen);
     }
 }
 
 // Setup round with course data from API
-function setupRoundWithCourse(courseDetails) {
-    appData.courseName = courseDetails.name;
-    appData.courseId = courseDetails.id;
-    appData.courseCity = courseDetails.city;
-    appData.courseState = courseDetails.state;
+function setupRoundWithCourse(courseDetails, originalCourse) {
+    console.log('⚙️ Setting up round with course details');
 
-    // Initialize holes
+    // Use club_name and course_name from API response
+    const courseName = courseDetails.club_name && courseDetails.course_name
+        ? `${courseDetails.club_name} - ${courseDetails.course_name}`
+        : (courseDetails.name || originalCourse.club_name || originalCourse.course_name || 'Unknown Course');
+
+    appData.courseName = courseName;
+    appData.courseId = courseDetails.id || originalCourse.id;
+    appData.courseCity = courseDetails.city || '';
+    appData.courseState = courseDetails.state || '';
+
+    // Initialize holes with default values
     initializeHoles();
 
-    // If the course has hole data, populate it
-    if (courseDetails.holes && courseDetails.holes.length > 0) {
+    // Extract holes from tee boxes
+    // API structure: courseDetails has tees array, each tee has holes array
+    if (courseDetails.tees && Array.isArray(courseDetails.tees) && courseDetails.tees.length > 0) {
+        // Use the first tee box by default (could later let user choose)
+        const selectedTee = courseDetails.tees[0];
+        console.log('🎯 Using tee box:', selectedTee.name || 'Default', 'with', selectedTee.holes?.length || 0, 'holes');
+
+        if (selectedTee.holes && Array.isArray(selectedTee.holes)) {
+            selectedTee.holes.forEach(holeData => {
+                const holeNumber = holeData.hole || holeData.number;
+                const holeIndex = holeNumber - 1;
+
+                if (holeIndex >= 0 && holeIndex < 18) {
+                    appData.holes[holeIndex].par = holeData.par || 4;
+                    appData.holes[holeIndex].yardage = holeData.yardage || null;
+                    appData.holes[holeIndex].handicap = holeData.handicap || null;
+                    console.log(`  Hole ${holeNumber}: Par ${holeData.par}, ${holeData.yardage} yards, HCP ${holeData.handicap}`);
+                }
+            });
+        }
+    } else if (courseDetails.holes && Array.isArray(courseDetails.holes)) {
+        // Fallback: if holes are directly on the course object
+        console.log('🎯 Using direct holes array with', courseDetails.holes.length, 'holes');
         courseDetails.holes.forEach(holeData => {
-            const holeIndex = holeData.number - 1;
+            const holeNumber = holeData.hole || holeData.number;
+            const holeIndex = holeNumber - 1;
+
             if (holeIndex >= 0 && holeIndex < 18) {
                 appData.holes[holeIndex].par = holeData.par || 4;
                 appData.holes[holeIndex].yardage = holeData.yardage || null;
@@ -313,6 +355,8 @@ function setupRoundWithCourse(courseDetails) {
             }
         });
     }
+
+    console.log('✅ Course setup complete with', appData.holes.filter(h => h.par !== 4).length, 'non-par-4 holes');
 
     // Now show setup screen to add players
     courseNameInput.value = appData.courseName;
@@ -730,25 +774,64 @@ function saveRoundToHistory() {
     // Get existing history
     const history = JSON.parse(localStorage.getItem('roundHistory') || '[]');
 
-    // Add current round to history
-    const roundData = {
-        id: Date.now(), // Unique ID for this round
-        courseName: appData.courseName,
-        courseCity: appData.courseCity,
-        courseState: appData.courseState,
-        date: appData.roundDate,
-        players: appData.players,
-        holes: appData.holes,
-        savedAt: new Date().toISOString()
-    };
+    // Check if we're editing an existing round
+    if (appData.editingRoundId) {
+        console.log('💾 Updating existing round:', appData.editingRoundId);
 
-    history.unshift(roundData); // Add to beginning (newest first)
+        // Find and update the existing round
+        const roundIndex = history.findIndex(r => r.id === appData.editingRoundId);
+        if (roundIndex !== -1) {
+            // Update the round data while keeping the original ID and savedAt
+            history[roundIndex] = {
+                id: appData.editingRoundId,
+                courseName: appData.courseName,
+                courseCity: appData.courseCity,
+                courseState: appData.courseState,
+                date: appData.roundDate,
+                players: appData.players,
+                holes: appData.holes,
+                savedAt: history[roundIndex].savedAt, // Keep original save time
+                updatedAt: new Date().toISOString()
+            };
 
-    // Save to localStorage
-    localStorage.setItem('roundHistory', JSON.stringify(history));
+            // Save updated history
+            localStorage.setItem('roundHistory', JSON.stringify(history));
 
-    // Update player statistics
-    updatePlayerStatistics(roundData);
+            // Recalculate ALL player statistics from scratch
+            recalculateAllPlayerStats(history);
+
+            console.log('✅ Round updated successfully');
+        } else {
+            console.error('❌ Could not find round to update');
+        }
+
+        // Clear the editing flag
+        delete appData.editingRoundId;
+    } else {
+        console.log('💾 Saving new round to history');
+
+        // Add new round to history
+        const roundData = {
+            id: Date.now(), // Unique ID for this round
+            courseName: appData.courseName,
+            courseCity: appData.courseCity,
+            courseState: appData.courseState,
+            date: appData.roundDate,
+            players: appData.players,
+            holes: appData.holes,
+            savedAt: new Date().toISOString()
+        };
+
+        history.unshift(roundData); // Add to beginning (newest first)
+
+        // Save to localStorage
+        localStorage.setItem('roundHistory', JSON.stringify(history));
+
+        // Update player statistics
+        updatePlayerStatistics(roundData);
+
+        console.log('✅ New round saved successfully');
+    }
 }
 
 function displayHistory() {
@@ -764,9 +847,18 @@ function displayHistory() {
         return;
     }
 
+    // Sort by date descending (most recent first)
+    const sortedHistory = [...history].sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA; // Descending order
+    });
+
+    console.log('📊 Displaying', sortedHistory.length, 'rounds sorted by date (newest first)');
+
     historyList.innerHTML = '';
 
-    history.forEach(round => {
+    sortedHistory.forEach(round => {
         const roundDiv = document.createElement('div');
         roundDiv.className = 'history-item';
 
@@ -865,6 +957,15 @@ function showRoundDetail(round) {
     });
 
     html += '</table>';
+
+    // Add Edit and Delete buttons
+    html += `
+        <div class="action-buttons" style="margin-top: 20px;">
+            <button class="btn-primary" onclick="editRound(${round.id})">✏️ Edit Round</button>
+            <button class="btn-secondary" onclick="deleteRound(${round.id})" style="border-color: #ef4444; color: #ef4444;">🗑️ Delete Round</button>
+        </div>
+    `;
+
     detailScorecard.innerHTML = html;
 
     showScreen(roundDetailScreen);
@@ -1071,6 +1172,167 @@ backToStatsBtn.addEventListener('click', () => {
     displayPlayerStats();
     showScreen(statsScreen);
 });
+
+// ===================================
+// EDIT AND DELETE ROUNDS
+// ===================================
+
+// Edit an existing round
+function editRound(roundId) {
+    console.log('✏️ Editing round:', roundId);
+
+    // Find the round in history
+    const history = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+    const round = history.find(r => r.id === roundId);
+
+    if (!round) {
+        alert('Round not found!');
+        return;
+    }
+
+    // Confirm edit
+    if (!confirm('Edit this round? You can modify scores for all players.')) {
+        return;
+    }
+
+    // Load the round data into appData
+    appData = {
+        courseName: round.courseName,
+        courseId: round.courseId || null,
+        courseCity: round.courseCity || '',
+        courseState: round.courseState || '',
+        roundDate: round.date,
+        players: [...round.players],
+        currentHole: 1,
+        holes: JSON.parse(JSON.stringify(round.holes)) // Deep copy
+    };
+
+    // Mark this as an edit by storing the original round ID
+    appData.editingRoundId = roundId;
+
+    // Update the score screen with round info
+    courseNameDisplay.textContent = appData.courseName;
+    roundDateDisplay.textContent = new Date(appData.roundDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    // Build the player score cards
+    buildPlayerScoreCards();
+
+    // Update hole navigation
+    updateHoleNavigation();
+
+    // Save to localStorage as current round
+    saveCurrentRound();
+
+    // Show the score screen
+    showScreen(scoreScreen);
+}
+
+// Delete a round
+function deleteRound(roundId) {
+    console.log('🗑️ Deleting round:', roundId);
+
+    // Find the round in history
+    const history = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+    const round = history.find(r => r.id === roundId);
+
+    if (!round) {
+        alert('Round not found!');
+        return;
+    }
+
+    // Confirm deletion
+    const courseName = round.courseName;
+    const roundDate = new Date(round.date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    if (!confirm(`Delete this round?\n\n${courseName}\n${roundDate}\n\nThis action cannot be undone.`)) {
+        return;
+    }
+
+    // Remove the round from history
+    const updatedHistory = history.filter(r => r.id !== roundId);
+    localStorage.setItem('roundHistory', JSON.stringify(updatedHistory));
+
+    console.log('✅ Round deleted. Recalculating player statistics...');
+
+    // Recalculate ALL player statistics from scratch
+    recalculateAllPlayerStats(updatedHistory);
+
+    // Show success message and return to history
+    alert('Round deleted successfully!');
+    displayHistory();
+    showScreen(historyScreen);
+}
+
+// Recalculate all player statistics from round history
+function recalculateAllPlayerStats(history) {
+    console.log('🔄 Recalculating player stats from', history.length, 'rounds');
+
+    const stats = {};
+
+    history.forEach(round => {
+        const totalPar = round.holes.reduce((sum, hole) => sum + hole.par, 0);
+
+        round.players.forEach(playerName => {
+            if (!stats[playerName]) {
+                stats[playerName] = {
+                    roundsPlayed: 0,
+                    totalScore: 0,
+                    totalVsPar: 0,
+                    lowestScore: Infinity,
+                    highestScore: -Infinity,
+                    totalPutts: 0,
+                    courseStats: {}
+                };
+            }
+
+            // Calculate this round's stats
+            let playerTotal = 0;
+            let playerPutts = 0;
+            round.holes.forEach(hole => {
+                playerTotal += hole.scores[playerName].strokes;
+                playerPutts += hole.scores[playerName].putts;
+            });
+
+            const vsPar = playerTotal - totalPar;
+
+            // Update player stats
+            stats[playerName].roundsPlayed++;
+            stats[playerName].totalScore += playerTotal;
+            stats[playerName].totalVsPar += vsPar;
+            stats[playerName].lowestScore = Math.min(stats[playerName].lowestScore, playerTotal);
+            stats[playerName].highestScore = Math.max(stats[playerName].highestScore, playerTotal);
+            stats[playerName].totalPutts += playerPutts;
+
+            // Update course-specific stats
+            const courseName = round.courseName;
+            if (!stats[playerName].courseStats[courseName]) {
+                stats[playerName].courseStats[courseName] = {
+                    rounds: 0,
+                    totalScore: 0,
+                    lowestScore: Infinity
+                };
+            }
+            stats[playerName].courseStats[courseName].rounds++;
+            stats[playerName].courseStats[courseName].totalScore += playerTotal;
+            stats[playerName].courseStats[courseName].lowestScore = Math.min(
+                stats[playerName].courseStats[courseName].lowestScore,
+                playerTotal
+            );
+        });
+    });
+
+    localStorage.setItem('playerStats', JSON.stringify(stats));
+    console.log('✅ Player stats recalculated for', Object.keys(stats).length, 'players');
+}
 
 // ===================================
 // LOCAL STORAGE
