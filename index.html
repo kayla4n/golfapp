@@ -25,8 +25,14 @@
             <li><a href="#" id="navScoreEntry" class="menu-item">⛳ Score Entry</a></li>
             <li><a href="#" id="navCourseHistory" class="menu-item">📊 Course History</a></li>
             <li><a href="#" id="navPlayerStats" class="menu-item">👤 Player Stats</a></li>
+            <li><a href="#" id="navBackupRestore" class="menu-item">💾 Backup & Restore</a></li>
         </ul>
     </nav>
+
+    <!-- Storage Warning Banner -->
+    <div id="storageWarningBanner" class="storage-warning-banner" style="display: none;">
+        <!-- Warning content will be injected here -->
+    </div>
 
     <!-- Main container for the entire app -->
     <div class="app-container">
@@ -173,6 +179,67 @@
 
             <div id="playerDetailStats" class="player-detail-stats">
                 <!-- Detailed player statistics will be shown here -->
+            </div>
+        </div>
+
+        <!-- SCREEN 9: Backup & Restore -->
+        <div id="backupRestoreScreen" class="screen">
+            <h1>💾 Backup & Restore</h1>
+
+            <!-- Storage Info Section -->
+            <div class="storage-info-section">
+                <h3>Storage Status</h3>
+                <div id="storageInfoDisplay">
+                    <!-- Storage info will be dynamically inserted here -->
+                </div>
+            </div>
+
+            <!-- Export Section -->
+            <div class="backup-section">
+                <h3>Export Your Data</h3>
+                <p style="font-size: 14px; color: #666; margin-bottom: 16px;">
+                    Save your rounds as a backup file that you can restore later.
+                </p>
+
+                <button class="btn-primary" id="exportAllDataBtn" style="width: 100%; margin-bottom: 12px;">
+                    📦 Export All Data
+                </button>
+
+                <button class="btn-secondary" id="exportLast30DaysBtn" style="width: 100%; margin-bottom: 12px;">
+                    📅 Export Last 30 Days
+                </button>
+
+                <button class="btn-secondary" id="exportSelectedBtn" style="width: 100%; margin-bottom: 12px;">
+                    🎯 Export Selected Date Range
+                </button>
+
+                <button class="btn-secondary" id="exportCsvBtn" style="width: 100%;">
+                    📊 Export to CSV
+                </button>
+            </div>
+
+            <!-- Import Section -->
+            <div class="restore-section">
+                <h3>Import Data</h3>
+                <p style="font-size: 14px; color: #666; margin-bottom: 16px;">
+                    Restore rounds from a previously saved backup file.
+                </p>
+
+                <input type="file" id="importFileInput" accept=".json" style="display: none;">
+                <button class="btn-primary" id="importDataBtn" style="width: 100%;">
+                    📥 Import Backup File
+                </button>
+
+                <div id="importStatus" style="margin-top: 12px; font-size: 14px;">
+                    <!-- Import status messages will appear here -->
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div class="backup-instructions">
+                <h4>📱 Mobile Instructions</h4>
+                <p><strong>To Export:</strong> Tap Export, then choose "Save to Files" or "Save to iCloud Drive"</p>
+                <p><strong>To Import:</strong> Tap Import, then select your backup file from Files</p>
             </div>
         </div>
 

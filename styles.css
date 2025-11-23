@@ -752,3 +752,96 @@ button {
     font-size: 14px;
     margin: 4px 0;
 }
+
+/* ===================================
+   STORAGE WARNING BANNER
+   =================================== */
+
+.storage-warning-banner {
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    width: 100%;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ===================================
+   BACKUP & RESTORE SCREEN
+   =================================== */
+
+.storage-info-section,
+.backup-section,
+.restore-section,
+.backup-instructions {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 12px;
+}
+
+.storage-info-section h3,
+.backup-section h3,
+.restore-section h3 {
+    color: #CC9B7A;
+    font-size: 18px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.backup-instructions {
+    background: #e8f4f8;
+    border-left: 4px solid #3b82f6;
+}
+
+.backup-instructions h4 {
+    color: #1e40af;
+    font-size: 16px;
+    margin-bottom: 12px;
+}
+
+.backup-instructions p {
+    color: #1e3a8a;
+    font-size: 14px;
+    margin: 8px 0;
+    line-height: 1.5;
+}
+
+/* Storage progress bar */
+.storage-bar-container {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Storage stats grid - already defined in player stats, but adding specificity */
+.storage-stats-grid .stat-box {
+    background: white;
+    border: 1px solid #e0e0e0;
+}
+
+/* Mobile optimization for backup buttons */
+@media (max-width: 767px) {
+    .storage-info-section,
+    .backup-section,
+    .restore-section,
+    .backup-instructions {
+        padding: 16px;
+    }
+
+    .storage-stats-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
