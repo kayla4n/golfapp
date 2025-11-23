@@ -4,7 +4,7 @@
 
 // API Configuration for Golf Course API
 const GOLF_API_KEY = '274CKOV66N2XQTKWVD4EDPBIYM';
-const GOLF_API_BASE = 'https://externalapi.golfgenius.com/v2';
+const GOLF_API_BASE = 'https://api.golfcourseapi.com';
 
 // ===================================
 // DATA STRUCTURE
@@ -192,18 +192,25 @@ searchCoursesBtn.addEventListener('click', async () => {
 
     try {
         // Use the Golf Course API to search
-        const response = await fetch(`${GOLF_API_BASE}/courses?name=${encodeURIComponent(query)}`, {
+        const searchUrl = `${GOLF_API_BASE}/courses?name=${encodeURIComponent(query)}`;
+        console.log('🏌️ Searching golf courses at:', searchUrl);
+        console.log('🔑 Using authorization:', `Key ${GOLF_API_KEY}`);
+
+        const response = await fetch(searchUrl, {
             headers: {
                 'Authorization': `Key ${GOLF_API_KEY}`,
                 'Content-Type': 'application/json'
             }
         });
 
+        console.log('📡 Response status:', response.status, response.statusText);
+
         if (!response.ok) {
-            throw new Error('Failed to fetch courses');
+            throw new Error(`Failed to fetch courses: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
+        console.log('✅ Received data:', data);
         displayCourseResults(data.courses || []);
 
     } catch (error) {
@@ -257,18 +264,25 @@ async function selectCourse(course) {
 
     try {
         // Fetch course details including holes
-        const response = await fetch(`${GOLF_API_BASE}/courses/${course.id}`, {
+        const detailUrl = `${GOLF_API_BASE}/courses/${course.id}`;
+        console.log('📊 Fetching course details from:', detailUrl);
+        console.log('🔑 Using authorization:', `Key ${GOLF_API_KEY}`);
+
+        const response = await fetch(detailUrl, {
             headers: {
                 'Authorization': `Key ${GOLF_API_KEY}`,
                 'Content-Type': 'application/json'
             }
         });
 
+        console.log('📡 Response status:', response.status, response.statusText);
+
         if (!response.ok) {
-            throw new Error('Failed to fetch course details');
+            throw new Error(`Failed to fetch course details: ${response.status} ${response.statusText}`);
         }
 
         const courseDetails = await response.json();
+        console.log('✅ Received course details:', courseDetails);
         setupRoundWithCourse(courseDetails);
 
     } catch (error) {
