@@ -355,6 +355,7 @@ function setupRoundWithCourse(courseDetails, originalCourse) {
 
     if (courseDetails.tees) {
         console.log('🎯 Extracting tee information from API');
+        console.log('📊 Full tees object:', JSON.stringify(courseDetails.tees, null, 2));
 
         // Combine male and female tees
         const allTees = [];
@@ -369,16 +370,18 @@ function setupRoundWithCourse(courseDetails, originalCourse) {
 
         console.log('📋 Total tees found:', allTees.length);
 
-        // Store all tee information
+        // Store all tee information using correct API field names
         allTees.forEach((tee, index) => {
-            console.log(`  Tee ${index + 1}:`, tee.name || 'Unnamed', 'with', tee.holes?.length || 0, 'holes');
+            console.log(`  Tee ${index + 1}:`, tee.tee_name || tee.name || 'Unnamed', 'with', tee.holes?.length || 0, 'holes');
+            console.log(`    Full tee data:`, JSON.stringify(tee, null, 2));
 
             if (tee.holes && Array.isArray(tee.holes)) {
                 appData.tees.push({
-                    name: tee.name || `Tee ${index + 1}`,
-                    color: tee.color || null,
-                    holes: tee.holes.map(h => ({
-                        hole: h.hole || h.number,
+                    tee_name: tee.tee_name || tee.name || `Tee ${index + 1}`,
+                    total_yards: tee.total_yards || 0,
+                    par_total: tee.par_total || 0,
+                    holes: tee.holes.map((h, holeIdx) => ({
+                        hole: h.hole || h.number || (holeIdx + 1),
                         par: h.par,
                         yardage: h.yardage,
                         handicap: h.handicap
@@ -387,17 +390,20 @@ function setupRoundWithCourse(courseDetails, originalCourse) {
             }
         });
 
-        // Use the first tee's holes for par values
+        console.log('✅ Extracted tees:', JSON.stringify(appData.tees, null, 2));
+
+        // Use the first tee's holes for default par values
         if (allTees.length > 0 && allTees[0].holes && Array.isArray(allTees[0].holes)) {
-            console.log('🎯 Using first tee for par values');
-            allTees[0].holes.forEach(holeData => {
-                const holeNumber = holeData.hole || holeData.number;
+            console.log('🎯 Using first tee for default par values');
+            allTees[0].holes.forEach((holeData, index) => {
+                const holeNumber = holeData.hole || holeData.number || (index + 1);
                 const holeIndex = holeNumber - 1;
 
                 if (holeIndex >= 0 && holeIndex < 18) {
                     appData.holes[holeIndex].par = holeData.par || 4;
                     appData.holes[holeIndex].yardage = holeData.yardage || null;
                     appData.holes[holeIndex].handicap = holeData.handicap || null;
+                    console.log(`    Hole ${holeNumber}: Par ${holeData.par}, ${holeData.yardage} yards, HCP ${holeData.handicap}`);
                 }
             });
         }
@@ -406,6 +412,7 @@ function setupRoundWithCourse(courseDetails, originalCourse) {
     console.log('✅ Course setup complete:');
     console.log('  - Course:', appData.courseName);
     console.log('  - Tees stored:', appData.tees.length);
+    console.log('  - Sample hole data:', appData.holes[0]);
     console.log('  - Holes configured:', appData.holes.filter(h => h.par !== 4).length, 'non-par-4 holes');
 
     // Now show setup screen to add players
@@ -519,7 +526,13 @@ function buildPlayerScoreCards() {
         teeInfoDiv.className = 'hole-details';
         teeInfoDiv.style.cssText = 'background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;';
 
-        let teeInfoHTML = `<h3 style="margin: 0 0 12px 0; font-size: 16px; color: #333;">Hole ${appData.currentHole} - Par ${currentHoleData.par}</h3>`;
+        let teeInfoHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 16px; color: #333;">Hole ${appData.currentHole} - Par ${currentHoleData.par}</h3>
+                <button onclick="editHolePar()" style="padding: 6px 12px; background: #4f46e5; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">✏️ Edit Par</button>
+            </div>
+        `;
+        teeInfoHTML += '<h4 style="margin: 0 0 8px 0; font-size: 14px; color: #666;">Course Tee Information:</h4>';
         teeInfoHTML += '<div style="display: grid; gap: 8px; font-size: 14px;">';
 
         appData.tees.forEach(tee => {
@@ -527,7 +540,7 @@ function buildPlayerScoreCards() {
             if (holeInfo) {
                 teeInfoHTML += `
                     <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e5e7eb;">
-                        <span style="font-weight: 600; color: #4f46e5;">${tee.name}:</span>
+                        <span style="font-weight: 600; color: #4f46e5;">${tee.tee_name}:</span>
                         <span>${holeInfo.yardage} yards <span style="color: #6b7280;">(Handicap ${holeInfo.handicap})</span></span>
                     </div>
                 `;
@@ -686,6 +699,25 @@ function updateParButtons() {
     });
 }
 
+// Edit par function for manual override
+function editHolePar() {
+    const currentHoleData = appData.holes[appData.currentHole - 1];
+    const newPar = prompt(`Enter new par for Hole ${appData.currentHole}:`, currentHoleData.par);
+
+    if (newPar !== null && !isNaN(newPar) && newPar >= 3 && newPar <= 6) {
+        const parValue = parseInt(newPar);
+        appData.holes[appData.currentHole - 1].par = parValue;
+
+        // Rebuild player score cards to reflect the change
+        buildPlayerScoreCards();
+
+        // Save to localStorage
+        saveCurrentRound();
+    } else if (newPar !== null) {
+        alert('Please enter a valid par value (3-6)');
+    }
+}
+
 // Par button click handlers
 document.querySelectorAll('.par-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -769,7 +801,7 @@ function generateScorecard() {
 
         // Row for each tee
         appData.tees.forEach(tee => {
-            html += `<tr><td class="player-name" style="background: ${tee.color || '#4f46e5'}; color: white;">${tee.name}</td>`;
+            html += `<tr><td class="player-name" style="background: #4f46e5; color: white;">${tee.tee_name}</td>`;
             let totalYardage = 0;
 
             for (let holeNum = 1; holeNum <= 18; holeNum++) {
@@ -1047,7 +1079,7 @@ function showRoundDetail(round) {
 
         // Row for each tee
         round.tees.forEach(tee => {
-            html += `<tr><td class="player-name" style="background: ${tee.color || '#4f46e5'}; color: white;">${tee.name}</td>`;
+            html += `<tr><td class="player-name" style="background: #4f46e5; color: white;">${tee.tee_name}</td>`;
             let totalYardage = 0;
 
             for (let holeNum = 1; holeNum <= 18; holeNum++) {
