@@ -351,62 +351,54 @@ function setupRoundWithCourse(courseDetails, originalCourse) {
 
     // Extract ALL tee boxes from the API response
     // API structure: courseDetails.tees has "male" and "female" arrays
-    appData.tees = [];
-
     if (courseDetails.tees) {
         console.log('🎯 Extracting tee information from API');
         console.log('📊 Full tees object:', JSON.stringify(courseDetails.tees, null, 2));
 
-        // Combine male and female tees
-        const allTees = [];
-        if (courseDetails.tees.male && Array.isArray(courseDetails.tees.male)) {
-            console.log('  Found', courseDetails.tees.male.length, 'male tees');
-            allTees.push(...courseDetails.tees.male);
-        }
-        if (courseDetails.tees.female && Array.isArray(courseDetails.tees.female)) {
-            console.log('  Found', courseDetails.tees.female.length, 'female tees');
-            allTees.push(...courseDetails.tees.female);
-        }
+        // CRITICAL FIX: Extract male and female tees separately
+        const maleTees = courseDetails.tees?.male || [];
+        const femaleTees = courseDetails.tees?.female || [];
+        const allTees = [...maleTees, ...femaleTees];
 
-        console.log('📋 Total tees found:', allTees.length);
+        console.log('Male tees found:', maleTees.length);
+        console.log('Female tees found:', femaleTees.length);
+        console.log('Total tees extracted:', allTees.length);
 
-        // Store all tee information using correct API field names
-        allTees.forEach((tee, index) => {
+        // Store all tees directly
+        appData.tees = allTees.map((tee, index) => {
             console.log(`  Tee ${index + 1}:`, tee.tee_name || tee.name || 'Unnamed', 'with', tee.holes?.length || 0, 'holes');
-            console.log(`    Full tee data:`, JSON.stringify(tee, null, 2));
-
-            if (tee.holes && Array.isArray(tee.holes)) {
-                appData.tees.push({
-                    tee_name: tee.tee_name || tee.name || `Tee ${index + 1}`,
-                    total_yards: tee.total_yards || 0,
-                    par_total: tee.par_total || 0,
-                    holes: tee.holes.map((h, holeIdx) => ({
-                        hole: h.hole || h.number || (holeIdx + 1),
-                        par: h.par,
-                        yardage: h.yardage,
-                        handicap: h.handicap
-                    }))
-                });
-            }
+            return {
+                tee_name: tee.tee_name || tee.name || `Tee ${index + 1}`,
+                total_yards: tee.total_yards || 0,
+                par_total: tee.par_total || 0,
+                holes: (tee.holes || []).map((h, holeIdx) => ({
+                    hole: h.hole || h.number || (holeIdx + 1),
+                    par: h.par,
+                    yardage: h.yardage,
+                    handicap: h.handicap
+                }))
+            };
         });
 
-        console.log('✅ Extracted tees:', JSON.stringify(appData.tees, null, 2));
+        console.log('Tees stored:', appData.tees.length);
 
-        // Use the first tee's holes for default par values
-        if (allTees.length > 0 && allTees[0].holes && Array.isArray(allTees[0].holes)) {
-            console.log('🎯 Using first tee for default par values');
-            allTees[0].holes.forEach((holeData, index) => {
-                const holeNumber = holeData.hole || holeData.number || (index + 1);
-                const holeIndex = holeNumber - 1;
-
-                if (holeIndex >= 0 && holeIndex < 18) {
-                    appData.holes[holeIndex].par = holeData.par || 4;
-                    appData.holes[holeIndex].yardage = holeData.yardage || null;
-                    appData.holes[holeIndex].handicap = holeData.handicap || null;
-                    console.log(`    Hole ${holeNumber}: Par ${holeData.par}, ${holeData.yardage} yards, HCP ${holeData.handicap}`);
+        // Use first tee's holes to populate appData.holes
+        if (allTees.length > 0 && allTees[0].holes) {
+            console.log('Populating hole data from first tee:', allTees[0].tee_name || allTees[0].name);
+            appData.holes.forEach((hole, index) => {
+                if (allTees[0].holes[index]) {
+                    hole.par = allTees[0].holes[index].par || 4;
+                    hole.yardage = allTees[0].holes[index].yardage || null;
+                    hole.handicap = allTees[0].holes[index].handicap || null;
+                    console.log(`    Hole ${index + 1}: Par ${hole.par}, ${hole.yardage} yards, HCP ${hole.handicap}`);
                 }
             });
         }
+
+        console.log('Sample hole after update:', appData.holes[0]);
+    } else {
+        console.warn('⚠️ No tees data found in API response');
+        appData.tees = [];
     }
 
     console.log('✅ Course setup complete:');
