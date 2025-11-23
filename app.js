@@ -433,10 +433,24 @@ function setupRoundWithCourse(courseDetails, originalCourse) {
 
         console.log('Male tees found:', maleTees.length);
         console.log('Female tees found:', femaleTees.length);
-        console.log('Total tees extracted:', allTees.length);
+        console.log('Total tees before deduplication:', allTees.length);
+
+        // Deduplicate tees by name (case-insensitive)
+        const uniqueTees = [];
+        const seenNames = new Set();
+        allTees.forEach(tee => {
+            const teeName = tee.tee_name || tee.name || '';
+            const nameLower = teeName.toLowerCase();
+            if (!seenNames.has(nameLower)) {
+                seenNames.add(nameLower);
+                uniqueTees.push(tee);
+            }
+        });
+
+        console.log('Total tees after deduplication:', uniqueTees.length);
 
         // Store all tees directly
-        appData.tees = allTees.map((tee, index) => {
+        appData.tees = uniqueTees.map((tee, index) => {
             console.log(`  Tee ${index + 1}:`, tee.tee_name || tee.name || 'Unnamed', 'with', tee.holes?.length || 0, 'holes');
             return {
                 tee_name: tee.tee_name || tee.name || `Tee ${index + 1}`,
@@ -454,13 +468,13 @@ function setupRoundWithCourse(courseDetails, originalCourse) {
         console.log('Tees stored:', appData.tees.length);
 
         // Use first tee's holes to populate appData.holes
-        if (allTees.length > 0 && allTees[0].holes) {
-            console.log('Populating hole data from first tee:', allTees[0].tee_name || allTees[0].name);
+        if (uniqueTees.length > 0 && uniqueTees[0].holes) {
+            console.log('Populating hole data from first tee:', uniqueTees[0].tee_name || uniqueTees[0].name);
             appData.holes.forEach((hole, index) => {
-                if (allTees[0].holes[index]) {
-                    hole.par = allTees[0].holes[index].par || 4;
-                    hole.yardage = allTees[0].holes[index].yardage || null;
-                    hole.handicap = allTees[0].holes[index].handicap || null;
+                if (uniqueTees[0].holes[index]) {
+                    hole.par = uniqueTees[0].holes[index].par || 4;
+                    hole.yardage = uniqueTees[0].holes[index].yardage || null;
+                    hole.handicap = uniqueTees[0].holes[index].handicap || null;
                     console.log(`    Hole ${index + 1}: Par ${hole.par}, ${hole.yardage} yards, HCP ${hole.handicap}`);
                 }
             });
@@ -545,8 +559,8 @@ startRoundBtn.addEventListener('click', () => {
     appData.players.forEach(player => {
         appData.holes.forEach(hole => {
             hole.scores[player] = {
-                strokes: hole.par, // Default to par
-                putts: 2 // Default putts
+                strokes: null, // Start with blank score
+                putts: null // Start with blank putts
             };
         });
     });
@@ -583,19 +597,65 @@ function buildPlayerScoreCards() {
 
     const currentHoleData = appData.holes[appData.currentHole - 1];
 
-    // Display ALL tee information for current hole
+    // Add hole header with par and edit button at the top
+    const holeHeaderDiv = document.createElement('div');
+    holeHeaderDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 12px; background: #f8f9fa; border-radius: 8px;';
+    holeHeaderDiv.innerHTML = `
+        <h3 style="margin: 0; font-size: 18px; color: #333;">Hole ${appData.currentHole} - Par ${currentHoleData.par}</h3>
+        <button onclick="editHolePar()" style="padding: 8px 16px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 500;">✏️ Edit Par</button>
+    `;
+    playersScoreContainer.appendChild(holeHeaderDiv);
+
+    // Add player cards FIRST (above tee information)
+    appData.players.forEach(playerName => {
+        const playerScore = currentHoleData.scores[playerName];
+
+        const playerCard = document.createElement('div');
+        playerCard.className = 'player-card';
+
+        playerCard.innerHTML = `
+            <h3>${playerName}</h3>
+
+            <div class="score-control">
+                <label>Strokes</label>
+                <div class="score-input">
+                    <button class="score-btn" onclick="changeScore('${playerName}', 'strokes', -1)">−</button>
+                    <div class="score-value" id="strokes-${playerName}">${playerScore.strokes === null ? '' : playerScore.strokes}</div>
+                    <button class="score-btn" onclick="changeScore('${playerName}', 'strokes', 1)">+</button>
+                </div>
+            </div>
+
+            <div class="score-control">
+                <label>Putts</label>
+                <div class="score-input">
+                    <button class="score-btn" onclick="changeScore('${playerName}', 'putts', -1)">−</button>
+                    <div class="score-value" id="putts-${playerName}">${playerScore.putts === null ? '' : playerScore.putts}</div>
+                    <button class="score-btn" onclick="changeScore('${playerName}', 'putts', 1)">+</button>
+                </div>
+            </div>
+
+            <div class="player-stats">
+                <div class="stat">
+                    <div class="stat-label">Total Strokes</div>
+                    <div class="stat-value" id="total-${playerName}">${calculatePlayerTotal(playerName)}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">vs Par</div>
+                    <div class="stat-value" id="vspar-${playerName}">${getVsParDisplay(playerName)}</div>
+                </div>
+            </div>
+        `;
+
+        playersScoreContainer.appendChild(playerCard);
+    });
+
+    // Add tee information AFTER player cards
     if (appData.tees && appData.tees.length > 0) {
         const teeInfoDiv = document.createElement('div');
         teeInfoDiv.className = 'hole-details';
-        teeInfoDiv.style.cssText = 'background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;';
+        teeInfoDiv.style.cssText = 'background: #f8f9fa; padding: 16px; border-radius: 8px; margin-top: 16px;';
 
-        let teeInfoHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <h3 style="margin: 0; font-size: 16px; color: #333;">Hole ${appData.currentHole} - Par ${currentHoleData.par}</h3>
-                <button onclick="editHolePar()" style="padding: 6px 12px; background: #4f46e5; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">✏️ Edit Par</button>
-            </div>
-        `;
-        teeInfoHTML += '<h4 style="margin: 0 0 8px 0; font-size: 14px; color: #666;">Course Tee Information:</h4>';
+        let teeInfoHTML = '<h4 style="margin: 0 0 12px 0; font-size: 16px; color: #333;">Course Tee Information:</h4>';
         teeInfoHTML += '<div style="display: grid; gap: 8px; font-size: 14px;">';
 
         appData.tees.forEach(tee => {
@@ -617,7 +677,7 @@ function buildPlayerScoreCards() {
         // Fallback to basic display if no tee data
         const holeInfoDiv = document.createElement('div');
         holeInfoDiv.className = 'hole-details';
-        holeInfoDiv.style.cssText = 'background: #f0f0f0; padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center;';
+        holeInfoDiv.style.cssText = 'background: #f0f0f0; padding: 12px; border-radius: 8px; margin-top: 16px; text-align: center;';
 
         let holeInfoHTML = '';
         if (currentHoleData.yardage) {
@@ -631,48 +691,6 @@ function buildPlayerScoreCards() {
         playersScoreContainer.appendChild(holeInfoDiv);
     }
 
-    appData.players.forEach(playerName => {
-        const playerScore = currentHoleData.scores[playerName];
-
-        const playerCard = document.createElement('div');
-        playerCard.className = 'player-card';
-
-        playerCard.innerHTML = `
-            <h3>${playerName}</h3>
-
-            <div class="score-control">
-                <label>Strokes</label>
-                <div class="score-input">
-                    <button class="score-btn" onclick="changeScore('${playerName}', 'strokes', -1)">−</button>
-                    <div class="score-value" id="strokes-${playerName}">${playerScore.strokes}</div>
-                    <button class="score-btn" onclick="changeScore('${playerName}', 'strokes', 1)">+</button>
-                </div>
-            </div>
-
-            <div class="score-control">
-                <label>Putts</label>
-                <div class="score-input">
-                    <button class="score-btn" onclick="changeScore('${playerName}', 'putts', -1)">−</button>
-                    <div class="score-value" id="putts-${playerName}">${playerScore.putts}</div>
-                    <button class="score-btn" onclick="changeScore('${playerName}', 'putts', 1)">+</button>
-                </div>
-            </div>
-
-            <div class="player-stats">
-                <div class="stat">
-                    <div class="stat-label">Total Strokes</div>
-                    <div class="stat-value" id="total-${playerName}">${calculatePlayerTotal(playerName)}</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-label">vs Par</div>
-                    <div class="stat-value" id="vspar-${playerName}">${getVsParDisplay(playerName)}</div>
-                </div>
-            </div>
-        `;
-
-        playersScoreContainer.appendChild(playerCard);
-    });
-
     // Update par buttons for current hole
     updateParButtons();
 }
@@ -682,11 +700,20 @@ function changeScore(playerName, type, delta) {
     const currentHoleData = appData.holes[appData.currentHole - 1];
     const playerScore = currentHoleData.scores[playerName];
 
-    // Update the score (prevent negative values)
-    playerScore[type] = Math.max(0, playerScore[type] + delta);
+    // Handle null values: if null and decrementing, do nothing; if null and incrementing, start at 1
+    if (playerScore[type] === null) {
+        if (delta > 0) {
+            playerScore[type] = 1;
+        } else {
+            return; // Do nothing when decrementing from null
+        }
+    } else {
+        // Update the score (prevent negative values)
+        playerScore[type] = Math.max(0, playerScore[type] + delta);
+    }
 
     // Update the display
-    document.getElementById(`${type}-${playerName}`).textContent = playerScore[type];
+    document.getElementById(`${type}-${playerName}`).textContent = playerScore[type] === null ? '' : playerScore[type];
 
     // Update total and vs par
     document.getElementById(`total-${playerName}`).textContent = calculatePlayerTotal(playerName);
@@ -711,7 +738,8 @@ function changeScore(playerName, type, delta) {
 function calculatePlayerTotal(playerName) {
     let total = 0;
     for (let i = 0; i < appData.currentHole; i++) {
-        total += appData.holes[i].scores[playerName].strokes;
+        const strokes = appData.holes[i].scores[playerName].strokes;
+        total += strokes === null ? 0 : strokes;
     }
     return total;
 }
@@ -721,7 +749,8 @@ function calculatePlayerTotalPutts(playerName) {
     let total = 0;
     for (let i = 0; i < 18; i++) {
         if (appData.holes[i].scores[playerName]) {
-            total += appData.holes[i].scores[playerName].putts;
+            const putts = appData.holes[i].scores[playerName].putts;
+            total += putts === null ? 0 : putts;
         }
     }
     return total;
@@ -733,7 +762,8 @@ function calculateVsPar(playerName) {
     let totalPar = 0;
 
     for (let i = 0; i < appData.currentHole; i++) {
-        totalStrokes += appData.holes[i].scores[playerName].strokes;
+        const strokes = appData.holes[i].scores[playerName].strokes;
+        totalStrokes += strokes === null ? 0 : strokes;
         totalPar += appData.holes[i].par;
     }
 
