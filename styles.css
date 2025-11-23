@@ -12,10 +12,10 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #CC9B7A 0%, #D97757 100%);
     min-height: 100vh;
     padding: 10px;
-    color: #333;
+    color: #1F1F1F;
 }
 
 /* ===================================
@@ -37,7 +37,7 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 28px;
-    color: #667eea;
+    color: #CC9B7A;
     transition: transform 0.3s;
 }
 
@@ -85,7 +85,7 @@ body {
 /* Sidebar header */
 .sidebar-header {
     padding: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #CC9B7A 0%, #D97757 100%);
     color: white;
     display: flex;
     justify-content: space-between;
@@ -165,7 +165,7 @@ body {
 /* Typography */
 h1 {
     font-size: 28px;
-    color: #667eea;
+    color: #CC9B7A;
     margin-bottom: 24px;
     text-align: center;
 }
@@ -205,7 +205,7 @@ input[type="date"] {
 
 input:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #CC9B7A;
 }
 
 .player-input {
@@ -229,7 +229,7 @@ button {
 
 .btn-primary {
     width: 100%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #CC9B7A 0%, #D97757 100%);
     color: white;
     padding: 16px;
     margin-top: 10px;
@@ -242,8 +242,8 @@ button {
 .btn-secondary {
     width: 100%;
     background: white;
-    color: #667eea;
-    border: 2px solid #667eea;
+    color: #CC9B7A;
+    border: 2px solid #CC9B7A;
     padding: 12px;
 }
 
@@ -291,7 +291,7 @@ button {
 
 .btn-nav {
     flex: 1;
-    background: #667eea;
+    background: #CC9B7A;
     color: white;
     padding: 12px;
 }
@@ -306,7 +306,7 @@ button {
     text-align: center;
     font-size: 24px;
     font-weight: bold;
-    color: #667eea;
+    color: #CC9B7A;
     margin: 0;
 }
 
@@ -345,9 +345,9 @@ button {
 }
 
 .par-btn.active {
-    background: #667eea;
+    background: #CC9B7A;
     color: white;
-    border-color: #667eea;
+    border-color: #CC9B7A;
 }
 
 /* Player score cards */
@@ -367,7 +367,7 @@ button {
 
 .player-card h3 {
     margin-bottom: 16px;
-    color: #667eea;
+    color: #CC9B7A;
     font-size: 18px;
 }
 
@@ -389,7 +389,7 @@ button {
 .score-btn {
     width: 50px;
     height: 50px;
-    background: #667eea;
+    background: #CC9B7A;
     color: white;
     font-size: 24px;
     border-radius: 8px;
@@ -399,7 +399,7 @@ button {
 }
 
 .score-btn:active {
-    background: #5568d3;
+    background: #B88969;
 }
 
 .score-value {
@@ -470,7 +470,7 @@ button {
 }
 
 .scorecard-table th {
-    background: #667eea;
+    background: #CC9B7A;
     color: white;
     font-weight: 600;
     position: sticky;
@@ -484,7 +484,7 @@ button {
 .scorecard-table .player-name {
     text-align: left;
     font-weight: 600;
-    color: #667eea;
+    color: #CC9B7A;
 }
 
 .scorecard-table .total-col {
@@ -567,7 +567,7 @@ button {
 }
 
 .course-result h3 {
-    color: #667eea;
+    color: #CC9B7A;
     font-size: 18px;
     margin-bottom: 8px;
 }
@@ -609,7 +609,7 @@ button {
 }
 
 .history-item h3 {
-    color: #667eea;
+    color: #CC9B7A;
     font-size: 18px;
     margin-bottom: 8px;
 }
@@ -640,7 +640,7 @@ button {
 }
 
 .player-score-badge .score {
-    color: #667eea;
+    color: #CC9B7A;
     margin-left: 4px;
 }
 
@@ -679,7 +679,7 @@ button {
 }
 
 .player-stats-item h3 {
-    color: #667eea;
+    color: #CC9B7A;
     font-size: 20px;
     margin-bottom: 12px;
 }
@@ -727,7 +727,7 @@ button {
 }
 
 .stats-section h3 {
-    color: #667eea;
+    color: #CC9B7A;
     font-size: 18px;
     margin-bottom: 16px;
     padding-bottom: 8px;
