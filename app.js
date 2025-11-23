@@ -19,7 +19,8 @@ let appData = {
     roundDate: '',
     players: [],
     currentHole: 1,
-    holes: [] // Array of hole objects with par, yardage, handicap, scores
+    holes: [], // Array of hole objects with par, yardage, handicap, scores
+    tees: [] // Array of all tee boxes with their information
 };
 
 // Stored data in localStorage
@@ -213,8 +214,20 @@ searchCoursesBtn.addEventListener('click', async () => {
 
         const data = await response.json();
         console.log('✅ Received search data:', data);
-        // API returns array directly
-        displayCourseResults(Array.isArray(data) ? data : []);
+
+        // Check if API returned data in expected format
+        let courses = [];
+        if (data && data.courses && Array.isArray(data.courses)) {
+            console.log('📋 Found courses array with', data.courses.length, 'courses');
+            courses = data.courses;
+        } else if (Array.isArray(data)) {
+            console.log('📋 Data is direct array with', data.length, 'courses');
+            courses = data;
+        } else {
+            console.warn('⚠️ Unexpected API response format:', data);
+        }
+
+        displayCourseResults(courses);
 
     } catch (error) {
         console.error('Error searching courses:', error);
@@ -243,7 +256,14 @@ function displayCourseResults(courses) {
 
     searchResults.innerHTML = '';
 
-    courses.forEach(course => {
+    courses.forEach((course, index) => {
+        console.log(`Course ${index + 1}:`, {
+            id: course.id,
+            club_name: course.club_name,
+            course_name: course.course_name,
+            location: course.location
+        });
+
         const courseDiv = document.createElement('div');
         courseDiv.className = 'course-result';
 
@@ -252,10 +272,17 @@ function displayCourseResults(courses) {
             ? `${course.club_name} - ${course.course_name}`
             : (course.club_name || course.course_name || course.name || 'Unknown Course');
 
-        // Location can be a string or object
-        const location = typeof course.location === 'string'
-            ? course.location
-            : (course.city && course.state ? `${course.city}, ${course.state}` : 'Location N/A');
+        // Location can be a string or object with city/state properties
+        let location = 'Location N/A';
+        if (course.location) {
+            if (typeof course.location === 'string') {
+                location = course.location;
+            } else if (course.location.city || course.location.state) {
+                const city = course.location.city || '';
+                const state = course.location.state || '';
+                location = [city, state].filter(Boolean).join(', ');
+            }
+        }
 
         courseDiv.innerHTML = `
             <h3>${displayName}</h3>
@@ -307,6 +334,7 @@ async function selectCourse(course) {
 // Setup round with course data from API
 function setupRoundWithCourse(courseDetails, originalCourse) {
     console.log('⚙️ Setting up round with course details');
+    console.log('📊 Full course details:', courseDetails);
 
     // Use club_name and course_name from API response
     const courseName = courseDetails.club_name && courseDetails.course_name
@@ -321,15 +349,48 @@ function setupRoundWithCourse(courseDetails, originalCourse) {
     // Initialize holes with default values
     initializeHoles();
 
-    // Extract holes from tee boxes
-    // API structure: courseDetails has tees array, each tee has holes array
-    if (courseDetails.tees && Array.isArray(courseDetails.tees) && courseDetails.tees.length > 0) {
-        // Use the first tee box by default (could later let user choose)
-        const selectedTee = courseDetails.tees[0];
-        console.log('🎯 Using tee box:', selectedTee.name || 'Default', 'with', selectedTee.holes?.length || 0, 'holes');
+    // Extract ALL tee boxes from the API response
+    // API structure: courseDetails.tees has "male" and "female" arrays
+    appData.tees = [];
 
-        if (selectedTee.holes && Array.isArray(selectedTee.holes)) {
-            selectedTee.holes.forEach(holeData => {
+    if (courseDetails.tees) {
+        console.log('🎯 Extracting tee information from API');
+
+        // Combine male and female tees
+        const allTees = [];
+        if (courseDetails.tees.male && Array.isArray(courseDetails.tees.male)) {
+            console.log('  Found', courseDetails.tees.male.length, 'male tees');
+            allTees.push(...courseDetails.tees.male);
+        }
+        if (courseDetails.tees.female && Array.isArray(courseDetails.tees.female)) {
+            console.log('  Found', courseDetails.tees.female.length, 'female tees');
+            allTees.push(...courseDetails.tees.female);
+        }
+
+        console.log('📋 Total tees found:', allTees.length);
+
+        // Store all tee information
+        allTees.forEach((tee, index) => {
+            console.log(`  Tee ${index + 1}:`, tee.name || 'Unnamed', 'with', tee.holes?.length || 0, 'holes');
+
+            if (tee.holes && Array.isArray(tee.holes)) {
+                appData.tees.push({
+                    name: tee.name || `Tee ${index + 1}`,
+                    color: tee.color || null,
+                    holes: tee.holes.map(h => ({
+                        hole: h.hole || h.number,
+                        par: h.par,
+                        yardage: h.yardage,
+                        handicap: h.handicap
+                    }))
+                });
+            }
+        });
+
+        // Use the first tee's holes for par values
+        if (allTees.length > 0 && allTees[0].holes && Array.isArray(allTees[0].holes)) {
+            console.log('🎯 Using first tee for par values');
+            allTees[0].holes.forEach(holeData => {
                 const holeNumber = holeData.hole || holeData.number;
                 const holeIndex = holeNumber - 1;
 
@@ -337,26 +398,15 @@ function setupRoundWithCourse(courseDetails, originalCourse) {
                     appData.holes[holeIndex].par = holeData.par || 4;
                     appData.holes[holeIndex].yardage = holeData.yardage || null;
                     appData.holes[holeIndex].handicap = holeData.handicap || null;
-                    console.log(`  Hole ${holeNumber}: Par ${holeData.par}, ${holeData.yardage} yards, HCP ${holeData.handicap}`);
                 }
             });
         }
-    } else if (courseDetails.holes && Array.isArray(courseDetails.holes)) {
-        // Fallback: if holes are directly on the course object
-        console.log('🎯 Using direct holes array with', courseDetails.holes.length, 'holes');
-        courseDetails.holes.forEach(holeData => {
-            const holeNumber = holeData.hole || holeData.number;
-            const holeIndex = holeNumber - 1;
-
-            if (holeIndex >= 0 && holeIndex < 18) {
-                appData.holes[holeIndex].par = holeData.par || 4;
-                appData.holes[holeIndex].yardage = holeData.yardage || null;
-                appData.holes[holeIndex].handicap = holeData.handicap || null;
-            }
-        });
     }
 
-    console.log('✅ Course setup complete with', appData.holes.filter(h => h.par !== 4).length, 'non-par-4 holes');
+    console.log('✅ Course setup complete:');
+    console.log('  - Course:', appData.courseName);
+    console.log('  - Tees stored:', appData.tees.length);
+    console.log('  - Holes configured:', appData.holes.filter(h => h.par !== 4).length, 'non-par-4 holes');
 
     // Now show setup screen to add players
     courseNameInput.value = appData.courseName;
@@ -463,23 +513,46 @@ function buildPlayerScoreCards() {
 
     const currentHoleData = appData.holes[appData.currentHole - 1];
 
-    // Display hole information if available
-    let holeInfoHTML = '';
-    if (currentHoleData.yardage || currentHoleData.handicap) {
-        holeInfoHTML = '<div class="hole-details" style="background: #f0f0f0; padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center;">';
+    // Display ALL tee information for current hole
+    if (appData.tees && appData.tees.length > 0) {
+        const teeInfoDiv = document.createElement('div');
+        teeInfoDiv.className = 'hole-details';
+        teeInfoDiv.style.cssText = 'background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;';
+
+        let teeInfoHTML = `<h3 style="margin: 0 0 12px 0; font-size: 16px; color: #333;">Hole ${appData.currentHole} - Par ${currentHoleData.par}</h3>`;
+        teeInfoHTML += '<div style="display: grid; gap: 8px; font-size: 14px;">';
+
+        appData.tees.forEach(tee => {
+            const holeInfo = tee.holes.find(h => h.hole === appData.currentHole);
+            if (holeInfo) {
+                teeInfoHTML += `
+                    <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e5e7eb;">
+                        <span style="font-weight: 600; color: #4f46e5;">${tee.name}:</span>
+                        <span>${holeInfo.yardage} yards <span style="color: #6b7280;">(Handicap ${holeInfo.handicap})</span></span>
+                    </div>
+                `;
+            }
+        });
+
+        teeInfoHTML += '</div>';
+        teeInfoDiv.innerHTML = teeInfoHTML;
+        playersScoreContainer.appendChild(teeInfoDiv);
+    } else if (currentHoleData.yardage || currentHoleData.handicap) {
+        // Fallback to basic display if no tee data
+        const holeInfoDiv = document.createElement('div');
+        holeInfoDiv.className = 'hole-details';
+        holeInfoDiv.style.cssText = 'background: #f0f0f0; padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center;';
+
+        let holeInfoHTML = '';
         if (currentHoleData.yardage) {
             holeInfoHTML += `<span style="margin-right: 16px;">📏 ${currentHoleData.yardage} yards</span>`;
         }
         if (currentHoleData.handicap) {
             holeInfoHTML += `<span>⚡ Handicap ${currentHoleData.handicap}</span>`;
         }
-        holeInfoHTML += '</div>';
-    }
 
-    if (holeInfoHTML) {
-        const holeInfoDiv = document.createElement('div');
         holeInfoDiv.innerHTML = holeInfoHTML;
-        playersScoreContainer.appendChild(holeInfoDiv.firstChild);
+        playersScoreContainer.appendChild(holeInfoDiv);
     }
 
     appData.players.forEach(playerName => {
@@ -678,7 +751,50 @@ backToScoreBtn.addEventListener('click', () => {
 });
 
 function generateScorecard() {
-    let html = '<table class="scorecard-table">';
+    let html = '';
+
+    // Display all tee information first if available
+    if (appData.tees && appData.tees.length > 0) {
+        html += '<div style="margin-bottom: 24px;">';
+        html += '<h3 style="margin-bottom: 12px; color: #333;">Course Tee Information</h3>';
+        html += '<div style="overflow-x: auto;">';
+        html += '<table class="scorecard-table" style="margin-bottom: 0;">';
+
+        // Header row with hole numbers
+        html += '<tr><th>Tee</th>';
+        for (let i = 1; i <= 18; i++) {
+            html += `<th>${i}</th>`;
+        }
+        html += '<th class="total-col">Total</th></tr>';
+
+        // Row for each tee
+        appData.tees.forEach(tee => {
+            html += `<tr><td class="player-name" style="background: ${tee.color || '#4f46e5'}; color: white;">${tee.name}</td>`;
+            let totalYardage = 0;
+
+            for (let holeNum = 1; holeNum <= 18; holeNum++) {
+                const holeInfo = tee.holes.find(h => h.hole === holeNum);
+                if (holeInfo) {
+                    html += `<td title="Par ${holeInfo.par}, HCP ${holeInfo.handicap}">${holeInfo.yardage}</td>`;
+                    totalYardage += holeInfo.yardage || 0;
+                } else {
+                    html += '<td>-</td>';
+                }
+            }
+
+            html += `<td class="total-col" style="font-weight: bold;">${totalYardage}</td>`;
+            html += '</tr>';
+        });
+
+        html += '</table>';
+        html += '</div>';
+        html += '</div>';
+    }
+
+    // Player scores table
+    html += '<h3 style="margin-bottom: 12px; color: #333;">Player Scores</h3>';
+    html += '<div style="overflow-x: auto;">';
+    html += '<table class="scorecard-table">';
 
     // Header row with hole numbers
     html += '<tr><th>Hole</th>';
@@ -727,6 +843,7 @@ function generateScorecard() {
     });
 
     html += '</table>';
+    html += '</div>';
     scorecardContainer.innerHTML = html;
 }
 
@@ -753,7 +870,8 @@ saveFinishBtn.addEventListener('click', () => {
             roundDate: '',
             players: [],
             currentHole: 1,
-            holes: []
+            holes: [],
+            tees: []
         };
 
         localStorage.removeItem('currentRound');
@@ -790,6 +908,7 @@ function saveRoundToHistory() {
                 date: appData.roundDate,
                 players: appData.players,
                 holes: appData.holes,
+                tees: appData.tees || [],
                 savedAt: history[roundIndex].savedAt, // Keep original save time
                 updatedAt: new Date().toISOString()
             };
@@ -819,6 +938,7 @@ function saveRoundToHistory() {
             date: appData.roundDate,
             players: appData.players,
             holes: appData.holes,
+            tees: appData.tees || [],
             savedAt: new Date().toISOString()
         };
 
@@ -909,7 +1029,50 @@ function showRoundDetail(round) {
     });
 
     // Generate detailed scorecard
-    let html = '<table class="scorecard-table">';
+    let html = '';
+
+    // Display all tee information first if available
+    if (round.tees && round.tees.length > 0) {
+        html += '<div style="margin-bottom: 24px;">';
+        html += '<h3 style="margin-bottom: 12px; color: #333;">Course Tee Information</h3>';
+        html += '<div style="overflow-x: auto;">';
+        html += '<table class="scorecard-table" style="margin-bottom: 0;">';
+
+        // Header row with hole numbers
+        html += '<tr><th>Tee</th>';
+        for (let i = 1; i <= 18; i++) {
+            html += `<th>${i}</th>`;
+        }
+        html += '<th class="total-col">Total</th></tr>';
+
+        // Row for each tee
+        round.tees.forEach(tee => {
+            html += `<tr><td class="player-name" style="background: ${tee.color || '#4f46e5'}; color: white;">${tee.name}</td>`;
+            let totalYardage = 0;
+
+            for (let holeNum = 1; holeNum <= 18; holeNum++) {
+                const holeInfo = tee.holes.find(h => h.hole === holeNum);
+                if (holeInfo) {
+                    html += `<td title="Par ${holeInfo.par}, HCP ${holeInfo.handicap}">${holeInfo.yardage}</td>`;
+                    totalYardage += holeInfo.yardage || 0;
+                } else {
+                    html += '<td>-</td>';
+                }
+            }
+
+            html += `<td class="total-col" style="font-weight: bold;">${totalYardage}</td>`;
+            html += '</tr>';
+        });
+
+        html += '</table>';
+        html += '</div>';
+        html += '</div>';
+    }
+
+    // Player scores table
+    html += '<h3 style="margin-bottom: 12px; color: #333;">Player Scores</h3>';
+    html += '<div style="overflow-x: auto;">';
+    html += '<table class="scorecard-table">';
 
     // Header
     html += '<tr><th>Hole</th>';
@@ -957,6 +1120,7 @@ function showRoundDetail(round) {
     });
 
     html += '</table>';
+    html += '</div>';
 
     // Add Edit and Delete buttons
     html += `
@@ -1204,7 +1368,8 @@ function editRound(roundId) {
         roundDate: round.date,
         players: [...round.players],
         currentHole: 1,
-        holes: JSON.parse(JSON.stringify(round.holes)) // Deep copy
+        holes: JSON.parse(JSON.stringify(round.holes)), // Deep copy
+        tees: JSON.parse(JSON.stringify(round.tees || [])) // Deep copy
     };
 
     // Mark this as an edit by storing the original round ID
