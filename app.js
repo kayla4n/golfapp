@@ -7,6 +7,443 @@ const GOLF_API_KEY = '274CKOV66N2XQTKWVD4EDPBIYM';
 const GOLF_API_BASE = 'https://api.golfcourseapi.com';
 
 // ===================================
+// SUPABASE CONFIGURATION
+// ===================================
+
+const SUPABASE_URL = 'https://yptsoezkkjixhephjlfi.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlwdHNvZXpra2ppeGhlcGhqbGZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyMjYwMzgsImV4cCI6MjA3OTgwMjAzOH0.tCJBCjf2KVMvLbxCaEtU70nDFHQeKeZR6VrSXWDYjHI';
+
+// Initialize Supabase client
+let supabase = null;
+let currentUserId = null;
+
+// Sync state management
+let syncState = {
+    isOnline: navigator.onLine,
+    isSyncing: false,
+    lastSyncTime: null,
+    pendingChanges: 0,
+    isAuthenticated: false
+};
+
+// ===================================
+// SUPABASE AUTHENTICATION
+// ===================================
+
+async function initSupabase() {
+    try {
+        console.log('🔧 Initializing Supabase client...');
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('✅ Supabase client initialized');
+        return true;
+    } catch (error) {
+        console.error('❌ Failed to initialize Supabase:', error);
+        updateSyncStatus('error', 'Failed to initialize cloud sync');
+        return false;
+    }
+}
+
+async function initAuth() {
+    try {
+        console.log('🔐 Initializing authentication...');
+        updateSyncStatus('syncing', 'Connecting to cloud...');
+
+        // Check if user is already signed in
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+            console.error('❌ Session error:', sessionError);
+            throw sessionError;
+        }
+
+        if (!session) {
+            console.log('🆕 No existing session, signing in anonymously...');
+            // Sign in anonymously (creates a persistent user)
+            const { data, error } = await supabase.auth.signInAnonymously();
+            if (error) {
+                console.error('❌ Anonymous auth error:', error);
+                throw error;
+            }
+            console.log('✅ Signed in anonymously:', data.user.id);
+            currentUserId = data.user.id;
+        } else {
+            console.log('✅ Already signed in:', session.user.id);
+            currentUserId = session.user.id;
+        }
+
+        syncState.isAuthenticated = true;
+        updateSyncStatus('synced', 'Connected to cloud');
+        updateCloudSyncUI();
+
+        // Check for local data to migrate
+        checkForLocalDataMigration();
+
+        // Load rounds from cloud
+        await loadRoundsFromCloud();
+
+        return currentUserId;
+    } catch (error) {
+        console.error('❌ Auth initialization failed:', error);
+        syncState.isAuthenticated = false;
+        updateSyncStatus('error', 'Authentication failed');
+        updateCloudSyncUI();
+        return null;
+    }
+}
+
+// ===================================
+// CLOUD SYNC FUNCTIONS
+// ===================================
+
+function updateSyncStatus(status, message) {
+    console.log(`📡 Sync status: ${status} - ${message}`);
+
+    const syncIcon = document.getElementById('syncStatusIndicator')?.querySelector('.sync-icon');
+    const syncText = document.getElementById('syncStatusIndicator')?.querySelector('.sync-text');
+    const syncIconLarge = document.getElementById('syncIconLarge');
+    const syncStatusText = document.getElementById('syncStatusText');
+
+    let icon, color;
+    switch(status) {
+        case 'synced':
+            icon = '☁️';
+            color = '#4CAF50';
+            break;
+        case 'syncing':
+            icon = '📡';
+            color = '#2196F3';
+            break;
+        case 'offline':
+            icon = '⚠️';
+            color = '#FF9800';
+            break;
+        case 'error':
+            icon = '❌';
+            color = '#F44336';
+            break;
+        default:
+            icon = '⏳';
+            color = '#999';
+    }
+
+    if (syncIcon) syncIcon.textContent = icon;
+    if (syncText) syncText.textContent = message;
+    if (syncIconLarge) syncIconLarge.textContent = icon;
+    if (syncStatusText) {
+        syncStatusText.textContent = message;
+        syncStatusText.style.color = color;
+    }
+
+    syncState.isSyncing = (status === 'syncing');
+}
+
+function updateCloudSyncUI() {
+    const userIdDisplay = document.getElementById('userIdDisplay');
+    const lastSyncDisplay = document.getElementById('lastSyncDisplay');
+    const lastSyncTime = document.getElementById('lastSyncTime');
+    const cloudRoundsCount = document.getElementById('cloudRoundsCount');
+
+    if (userIdDisplay && currentUserId) {
+        userIdDisplay.textContent = currentUserId.substring(0, 8) + '...';
+    }
+
+    if (syncState.lastSyncTime) {
+        const timeAgo = getTimeAgo(syncState.lastSyncTime);
+        if (lastSyncDisplay) lastSyncDisplay.textContent = timeAgo;
+        if (lastSyncTime) lastSyncTime.textContent = timeAgo;
+    }
+
+    // Update cloud rounds count
+    if (cloudRoundsCount) {
+        const history = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+        cloudRoundsCount.textContent = history.length;
+    }
+}
+
+function getTimeAgo(timestamp) {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (seconds < 60) return 'Just now';
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+}
+
+async function saveRoundToCloud(roundData) {
+    if (!currentUserId || !supabase) {
+        console.log('⚠️ Not authenticated or Supabase not initialized, skipping cloud sync');
+        return null;
+    }
+
+    if (!syncState.isOnline) {
+        console.log('⚠️ Offline, will sync when back online');
+        syncState.pendingChanges++;
+        return null;
+    }
+
+    try {
+        console.log('☁️ Saving round to cloud:', roundData);
+        updateSyncStatus('syncing', 'Saving to cloud...');
+
+        const cloudRoundData = {
+            user_id: currentUserId,
+            course_name: roundData.courseName,
+            course_id: roundData.courseId || null,
+            round_date: roundData.date,
+            players: roundData.players,
+            holes: roundData.holes,
+            tees: roundData.tees || [],
+            saved_at: new Date().toISOString()
+        };
+
+        // Check if this round already exists in cloud (by checking if it has a supabaseId)
+        if (roundData.supabaseId) {
+            console.log('🔄 Updating existing round in cloud:', roundData.supabaseId);
+            const { data, error } = await supabase
+                .from('rounds')
+                .update({
+                    ...cloudRoundData,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', roundData.supabaseId)
+                .eq('user_id', currentUserId)
+                .select();
+
+            if (error) throw error;
+            console.log('✅ Round updated in cloud:', data);
+            syncState.lastSyncTime = Date.now();
+            updateSyncStatus('synced', 'Synced to cloud');
+            updateCloudSyncUI();
+            return data[0];
+        } else {
+            console.log('➕ Inserting new round to cloud');
+            const { data, error } = await supabase
+                .from('rounds')
+                .insert([cloudRoundData])
+                .select();
+
+            if (error) throw error;
+            console.log('✅ Round saved to cloud:', data[0].id);
+            syncState.lastSyncTime = Date.now();
+            updateSyncStatus('synced', 'Synced to cloud');
+            updateCloudSyncUI();
+            return data[0];
+        }
+    } catch (error) {
+        console.error('❌ Failed to save round to cloud:', error);
+        updateSyncStatus('error', 'Sync failed');
+        syncState.pendingChanges++;
+        return null;
+    }
+}
+
+async function loadRoundsFromCloud() {
+    if (!currentUserId || !supabase) {
+        console.log('⚠️ Not authenticated, skipping cloud load');
+        return [];
+    }
+
+    try {
+        console.log('📥 Loading rounds from cloud...');
+        updateSyncStatus('syncing', 'Loading from cloud...');
+
+        const { data, error } = await supabase
+            .from('rounds')
+            .select('*')
+            .eq('user_id', currentUserId)
+            .order('round_date', { ascending: false });
+
+        if (error) throw error;
+
+        console.log(`✅ Loaded ${data.length} rounds from cloud`);
+
+        // Merge cloud data with local data
+        mergeCloudDataWithLocal(data);
+
+        syncState.lastSyncTime = Date.now();
+        updateSyncStatus('synced', 'Synced');
+        updateCloudSyncUI();
+
+        return data;
+    } catch (error) {
+        console.error('❌ Failed to load rounds from cloud:', error);
+        updateSyncStatus('error', 'Failed to load from cloud');
+        return [];
+    }
+}
+
+function mergeCloudDataWithLocal(cloudRounds) {
+    console.log('🔄 Merging cloud data with local data...');
+
+    const localHistory = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+    const mergedRounds = [];
+    const cloudRoundMap = new Map();
+
+    // Create a map of cloud rounds by their ID
+    cloudRounds.forEach(cloudRound => {
+        const localRound = {
+            id: cloudRound.id, // Use Supabase UUID as id
+            supabaseId: cloudRound.id, // Store Supabase ID
+            courseName: cloudRound.course_name,
+            courseCity: '', // Not stored in cloud
+            courseState: '', // Not stored in cloud
+            date: cloudRound.round_date,
+            players: cloudRound.players,
+            holes: cloudRound.holes,
+            tees: cloudRound.tees || [],
+            savedAt: cloudRound.saved_at,
+            updatedAt: cloudRound.updated_at
+        };
+        cloudRoundMap.set(cloudRound.id, localRound);
+        mergedRounds.push(localRound);
+    });
+
+    // Add any local rounds that don't exist in cloud yet
+    localHistory.forEach(localRound => {
+        if (!localRound.supabaseId || !cloudRoundMap.has(localRound.supabaseId)) {
+            mergedRounds.push(localRound);
+        }
+    });
+
+    // Sort by date (newest first)
+    mergedRounds.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Save merged data back to localStorage
+    localStorage.setItem('roundHistory', JSON.stringify(mergedRounds));
+
+    console.log(`✅ Merged data: ${mergedRounds.length} total rounds`);
+}
+
+async function deleteRoundFromCloud(supabaseId) {
+    if (!currentUserId || !supabase || !supabaseId) {
+        console.log('⚠️ Cannot delete from cloud, missing data');
+        return false;
+    }
+
+    try {
+        console.log('🗑️ Deleting round from cloud:', supabaseId);
+        updateSyncStatus('syncing', 'Deleting from cloud...');
+
+        const { error } = await supabase
+            .from('rounds')
+            .delete()
+            .eq('id', supabaseId)
+            .eq('user_id', currentUserId);
+
+        if (error) throw error;
+
+        console.log('✅ Round deleted from cloud');
+        syncState.lastSyncTime = Date.now();
+        updateSyncStatus('synced', 'Synced');
+        updateCloudSyncUI();
+        return true;
+    } catch (error) {
+        console.error('❌ Failed to delete round from cloud:', error);
+        updateSyncStatus('error', 'Delete failed');
+        return false;
+    }
+}
+
+function checkForLocalDataMigration() {
+    const localHistory = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+    const unmigrated = localHistory.filter(round => !round.supabaseId);
+
+    if (unmigrated.length > 0) {
+        console.log(`📦 Found ${unmigrated.length} local rounds to migrate`);
+
+        // Show migration prompt after a short delay
+        setTimeout(() => {
+            if (confirm(`Found ${unmigrated.length} rounds in local storage. Upload to cloud?`)) {
+                migrateLocalDataToCloud();
+            }
+        }, 2000);
+    }
+}
+
+async function migrateLocalDataToCloud() {
+    const localHistory = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+    const unmigrated = localHistory.filter(round => !round.supabaseId);
+
+    if (unmigrated.length === 0) {
+        alert('No local data to migrate!');
+        return;
+    }
+
+    console.log(`📤 Migrating ${unmigrated.length} rounds to cloud...`);
+    updateSyncStatus('syncing', `Uploading ${unmigrated.length} rounds...`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const round of unmigrated) {
+        const cloudData = await saveRoundToCloud(round);
+        if (cloudData) {
+            // Update local round with Supabase ID
+            round.supabaseId = cloudData.id;
+            successCount++;
+        } else {
+            failCount++;
+        }
+    }
+
+    // Save updated local history
+    localStorage.setItem('roundHistory', JSON.stringify(localHistory));
+
+    console.log(`✅ Migration complete: ${successCount} success, ${failCount} failed`);
+    alert(`Migration complete!\n✅ ${successCount} rounds uploaded\n${failCount > 0 ? `❌ ${failCount} failed` : ''}`);
+    updateSyncStatus('synced', 'Migration complete');
+    updateCloudSyncUI();
+}
+
+async function resetAccount() {
+    if (!confirm('Are you sure you want to reset your account?\n\nThis will:\n- Sign you out\n- Create a new anonymous account\n- You will lose access to your current data unless you have a backup\n\nContinue?')) {
+        return;
+    }
+
+    try {
+        console.log('🔄 Resetting account (signing out)...');
+        await supabase.auth.signOut();
+        currentUserId = null;
+        syncState.isAuthenticated = false;
+
+        // Clear local storage
+        localStorage.removeItem('roundHistory');
+        localStorage.removeItem('currentRound');
+        localStorage.removeItem('playerStats');
+
+        alert('Account reset! Refreshing page...');
+        location.reload();
+    } catch (error) {
+        console.error('❌ Failed to reset account:', error);
+        alert('Failed to reset account: ' + error.message);
+    }
+}
+
+// Monitor online/offline status
+window.addEventListener('online', () => {
+    console.log('🌐 Back online');
+    syncState.isOnline = true;
+    updateSyncStatus('synced', 'Back online');
+
+    // Sync pending changes
+    if (syncState.pendingChanges > 0) {
+        console.log(`🔄 Syncing ${syncState.pendingChanges} pending changes...`);
+        loadRoundsFromCloud();
+    }
+});
+
+window.addEventListener('offline', () => {
+    console.log('📴 Gone offline');
+    syncState.isOnline = false;
+    updateSyncStatus('offline', 'Offline - will sync when back online');
+});
+
+// ===================================
 // STORAGE UTILITIES
 // ===================================
 
@@ -150,6 +587,13 @@ const importFileInput = document.getElementById('importFileInput');
 const importStatus = document.getElementById('importStatus');
 const navBackupRestore = document.getElementById('navBackupRestore');
 
+// Cloud Sync Screen
+const cloudSyncScreen = document.getElementById('cloudSyncScreen');
+const syncNowBtn = document.getElementById('syncNowBtn');
+const migrateLocalDataBtn = document.getElementById('migrateLocalDataBtn');
+const downloadCloudDataBtn = document.getElementById('downloadCloudDataBtn');
+const resetAccountBtn = document.getElementById('resetAccountBtn');
+
 // Storage Warning Banner
 const storageWarningBanner = document.getElementById('storageWarningBanner');
 
@@ -228,6 +672,14 @@ navBackupRestore.addEventListener('click', (e) => {
     closeSidebar();
     displayBackupRestore();
     showScreen(backupRestoreScreen);
+});
+
+const navCloudSync = document.getElementById('navCloudSync');
+navCloudSync.addEventListener('click', (e) => {
+    e.preventDefault();
+    closeSidebar();
+    updateCloudSyncUI();
+    showScreen(cloudSyncScreen);
 });
 
 // ===================================
@@ -1038,8 +1490,9 @@ function saveRoundToHistory() {
             const roundIndex = history.findIndex(r => r.id === appData.editingRoundId);
             if (roundIndex !== -1) {
                 // Update the round data while keeping the original ID and savedAt
-                history[roundIndex] = {
+                const updatedRound = {
                     id: appData.editingRoundId,
+                    supabaseId: history[roundIndex].supabaseId, // Keep Supabase ID
                     courseName: appData.courseName,
                     courseCity: appData.courseCity,
                     courseState: appData.courseState,
@@ -1051,8 +1504,13 @@ function saveRoundToHistory() {
                     updatedAt: new Date().toISOString()
                 };
 
+                history[roundIndex] = updatedRound;
+
                 // Save updated history
                 localStorage.setItem('roundHistory', JSON.stringify(history));
+
+                // Sync to cloud
+                saveRoundToCloud(updatedRound);
 
                 // Recalculate ALL player statistics from scratch
                 recalculateAllPlayerStats(history);
@@ -1084,6 +1542,16 @@ function saveRoundToHistory() {
 
             // Save to localStorage
             localStorage.setItem('roundHistory', JSON.stringify(history));
+
+            // Sync to cloud (async, but don't wait for it)
+            saveRoundToCloud(roundData).then(cloudData => {
+                if (cloudData) {
+                    // Update local round with Supabase ID
+                    roundData.supabaseId = cloudData.id;
+                    localStorage.setItem('roundHistory', JSON.stringify(history));
+                    console.log('✅ Round synced to cloud with ID:', cloudData.id);
+                }
+            });
 
             // Update player statistics
             updatePlayerStatistics(roundData);
@@ -1590,6 +2058,11 @@ function deleteRound(roundId) {
     const updatedHistory = history.filter(r => r.id !== roundId);
     localStorage.setItem('roundHistory', JSON.stringify(updatedHistory));
 
+    // Delete from cloud if it has a Supabase ID
+    if (round.supabaseId) {
+        deleteRoundFromCloud(round.supabaseId);
+    }
+
     console.log('✅ Round deleted. Recalculating player statistics...');
 
     // Recalculate ALL player statistics from scratch
@@ -2042,6 +2515,53 @@ importFileInput.addEventListener('change', (event) => {
     reader.readAsText(file);
 });
 
+// ===================================
+// CLOUD SYNC BUTTON EVENT LISTENERS
+// ===================================
+
+syncNowBtn.addEventListener('click', async () => {
+    console.log('🔄 Manual sync requested');
+    syncNowBtn.disabled = true;
+    syncNowBtn.textContent = '🔄 Syncing...';
+
+    try {
+        await loadRoundsFromCloud();
+        alert('✅ Sync complete!');
+    } catch (error) {
+        console.error('❌ Sync failed:', error);
+        alert('❌ Sync failed: ' + error.message);
+    } finally {
+        syncNowBtn.disabled = false;
+        syncNowBtn.textContent = '🔄 Sync Now';
+    }
+});
+
+migrateLocalDataBtn.addEventListener('click', async () => {
+    migrateLocalDataToCloud();
+});
+
+downloadCloudDataBtn.addEventListener('click', async () => {
+    console.log('📥 Downloading from cloud...');
+    downloadCloudDataBtn.disabled = true;
+    downloadCloudDataBtn.textContent = '⬇️ Downloading...';
+
+    try {
+        const cloudData = await loadRoundsFromCloud();
+        alert(`✅ Downloaded ${cloudData.length} rounds from cloud!`);
+        displayHistory(); // Refresh the history view
+    } catch (error) {
+        console.error('❌ Download failed:', error);
+        alert('❌ Download failed: ' + error.message);
+    } finally {
+        downloadCloudDataBtn.disabled = false;
+        downloadCloudDataBtn.textContent = '⬇️ Download from Cloud';
+    }
+});
+
+resetAccountBtn.addEventListener('click', () => {
+    resetAccount();
+});
+
 // Helper function to download JSON
 function downloadJSON(data, filename) {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -2078,21 +2598,39 @@ function getDateString() {
 // APP STARTUP
 // ===================================
 
-// Check storage on app load
-checkStorageAndShowWarning();
+// Initialize Supabase and authenticate on app load
+(async function initializeApp() {
+    console.log('🚀 Starting ForeScore app...');
 
-// Check if there's a current round in progress
-const savedRound = localStorage.getItem('currentRound');
-if (savedRound) {
-    const continueRound = confirm('You have a round in progress. Continue?');
-    if (continueRound) {
-        loadCurrentRound();
-        showScreen(scoreScreen);
+    // Initialize Supabase client
+    const supabaseInitialized = await initSupabase();
+
+    if (supabaseInitialized) {
+        // Authenticate user
+        await initAuth();
     } else {
-        // Show course search for new round
+        console.warn('⚠️ Cloud sync not available, continuing in offline mode');
+        updateSyncStatus('offline', 'Cloud sync unavailable');
+    }
+
+    // Check storage on app load
+    checkStorageAndShowWarning();
+
+    // Check if there's a current round in progress
+    const savedRound = localStorage.getItem('currentRound');
+    if (savedRound) {
+        const continueRound = confirm('You have a round in progress. Continue?');
+        if (continueRound) {
+            loadCurrentRound();
+            showScreen(scoreScreen);
+        } else {
+            // Show course search for new round
+            showScreen(courseSearchScreen);
+        }
+    } else {
+        // No round in progress - show course search
         showScreen(courseSearchScreen);
     }
-} else {
-    // No round in progress - show course search
-    showScreen(courseSearchScreen);
-}
+
+    console.log('✅ ForeScore app initialized');
+})();
