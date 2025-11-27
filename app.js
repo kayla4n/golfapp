@@ -935,7 +935,7 @@ function generateScorecard() {
         html += `<td>${hole.par}</td>`;
         totalPar += hole.par;
     });
-    html += `<td class="total-col">${totalPar}</td><td class="total-col">-</td></tr>';
+    html += `<td class="total-col">${totalPar}</td><td class="total-col">-</td></tr>`;
 
     // Player rows with putts per hole
     appData.players.forEach(playerName => {
