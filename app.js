@@ -926,7 +926,7 @@ function generateScorecard() {
     for (let i = 1; i <= 18; i++) {
         html += `<th>${i}</th>`;
     }
-    html += '<th class="total-col">Total</th><th class="total-col">Putts</th><th class="total-col">vs Par</th></tr>';
+    html += '<th class="total-col">Total</th><th class="total-col">vs Par</th></tr>';
 
     // Par row
     html += '<tr><td class="player-name">Par</td>';
@@ -935,10 +935,11 @@ function generateScorecard() {
         html += `<td>${hole.par}</td>`;
         totalPar += hole.par;
     });
-    html += `<td class="total-col">${totalPar}</td><td class="total-col">-</td><td class="total-col">-</td></tr>`;
+    html += `<td class="total-col">${totalPar}</td><td class="total-col">-</td></tr>';
 
-    // Player rows
+    // Player rows with putts per hole
     appData.players.forEach(playerName => {
+        // Player strokes row
         html += `<tr><td class="player-name">${playerName}</td>`;
         let playerTotal = 0;
         let playerTotalPutts = 0;
@@ -962,8 +963,19 @@ function generateScorecard() {
         const vsParColor = vsPar < 0 ? '#22c55e' : (vsPar > 0 ? '#ef4444' : '#333');
 
         html += `<td class="total-col">${playerTotal}</td>`;
-        html += `<td class="total-col">${playerTotalPutts}</td>`;
         html += `<td class="total-col" style="color: ${vsParColor}; font-weight: bold;">${vsParDisplay}</td>`;
+        html += '</tr>';
+
+        // Player putts row
+        html += `<tr style="background-color: #f9fafb;"><td class="player-name" style="padding-left: 24px; font-size: 0.9em; color: #6b7280; font-style: italic;">Putts</td>`;
+
+        appData.holes.forEach(hole => {
+            const putts = hole.scores[playerName].putts;
+            html += `<td style="color: #6b7280; font-size: 0.9em;">${putts}</td>`;
+        });
+
+        html += `<td class="total-col" style="color: #6b7280; font-weight: 600;">${playerTotalPutts}</td>`;
+        html += `<td class="total-col">-</td>`;
         html += '</tr>';
     });
 
@@ -1219,7 +1231,7 @@ function showRoundDetail(round) {
     for (let i = 1; i <= 18; i++) {
         html += `<th>${i}</th>`;
     }
-    html += '<th class="total-col">Total</th><th class="total-col">Putts</th><th class="total-col">vs Par</th></tr>';
+    html += '<th class="total-col">Total</th><th class="total-col">vs Par</th></tr>';
 
     // Par row
     html += '<tr><td class="player-name">Par</td>';
@@ -1228,10 +1240,11 @@ function showRoundDetail(round) {
         html += `<td>${hole.par}</td>`;
         totalPar += hole.par;
     });
-    html += `<td class="total-col">${totalPar}</td><td class="total-col">-</td><td class="total-col">-</td></tr>`;
+    html += `<td class="total-col">${totalPar}</td><td class="total-col">-</td></tr>`;
 
-    // Player rows
+    // Player rows with putts per hole
     round.players.forEach(playerName => {
+        // Player strokes row
         html += `<tr><td class="player-name">${playerName}</td>`;
         let playerTotal = 0;
         let playerTotalPutts = 0;
@@ -1254,8 +1267,19 @@ function showRoundDetail(round) {
         const vsParColor = vsPar < 0 ? '#22c55e' : (vsPar > 0 ? '#ef4444' : '#333');
 
         html += `<td class="total-col">${playerTotal}</td>`;
-        html += `<td class="total-col">${playerTotalPutts}</td>`;
         html += `<td class="total-col" style="color: ${vsParColor}; font-weight: bold;">${vsParDisplay}</td>`;
+        html += '</tr>';
+
+        // Player putts row
+        html += `<tr style="background-color: #f9fafb;"><td class="player-name" style="padding-left: 24px; font-size: 0.9em; color: #6b7280; font-style: italic;">Putts</td>`;
+
+        round.holes.forEach(hole => {
+            const putts = hole.scores[playerName].putts;
+            html += `<td style="color: #6b7280; font-size: 0.9em;">${putts}</td>`;
+        });
+
+        html += `<td class="total-col" style="color: #6b7280; font-weight: 600;">${playerTotalPutts}</td>`;
+        html += `<td class="total-col">-</td>`;
         html += '</tr>';
     });
 
