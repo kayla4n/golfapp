@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ForeScore</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <!-- Hamburger Menu Button (fixed to top) -->
@@ -25,8 +27,18 @@
             <li><a href="#" id="navScoreEntry" class="menu-item">⛳ Score Entry</a></li>
             <li><a href="#" id="navCourseHistory" class="menu-item">📊 Course History</a></li>
             <li><a href="#" id="navPlayerStats" class="menu-item">👤 Player Stats</a></li>
+            <li><a href="#" id="navCloudSync" class="menu-item">☁️ Cloud Sync</a></li>
             <li><a href="#" id="navBackupRestore" class="menu-item">💾 Backup & Restore</a></li>
         </ul>
+
+        <!-- Cloud Sync Status (at bottom of sidebar) -->
+        <div class="sync-status-widget">
+            <div id="syncStatusIndicator" class="sync-status-item">
+                <span class="sync-icon">⏳</span>
+                <span class="sync-text">Initializing...</span>
+            </div>
+            <div id="lastSyncTime" class="last-sync-time">Never synced</div>
+        </div>
     </nav>
 
     <!-- Storage Warning Banner -->
@@ -229,6 +241,73 @@
                 <h4>📱 Mobile Instructions</h4>
                 <p><strong>To Export:</strong> Tap Export, then choose "Save to Files" or "Save to iCloud Drive"</p>
                 <p><strong>To Import:</strong> Tap Import, then select your backup file from Files</p>
+            </div>
+        </div>
+
+        <!-- SCREEN 10: Cloud Sync -->
+        <div id="cloudSyncScreen" class="screen">
+            <h1>☁️ Cloud Sync</h1>
+
+            <!-- Sync Status Section -->
+            <div class="sync-section">
+                <h3>Sync Status</h3>
+                <div id="cloudSyncStatusDisplay" class="cloud-sync-status">
+                    <div class="status-indicator">
+                        <span class="sync-icon-large" id="syncIconLarge">⏳</span>
+                        <span class="sync-status-text" id="syncStatusText">Initializing...</span>
+                    </div>
+                    <div class="sync-details">
+                        <div class="sync-detail-item">
+                            <span class="detail-label">Last Sync:</span>
+                            <span class="detail-value" id="lastSyncDisplay">Never</span>
+                        </div>
+                        <div class="sync-detail-item">
+                            <span class="detail-label">Cloud Rounds:</span>
+                            <span class="detail-value" id="cloudRoundsCount">0</span>
+                        </div>
+                        <div class="sync-detail-item">
+                            <span class="detail-label">User ID:</span>
+                            <span class="detail-value" id="userIdDisplay">Not authenticated</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sync Actions -->
+            <div class="sync-actions-section">
+                <h3>Actions</h3>
+                <button class="btn-primary" id="syncNowBtn" style="width: 100%; margin-bottom: 12px;">
+                    🔄 Sync Now
+                </button>
+                <button class="btn-secondary" id="migrateLocalDataBtn" style="width: 100%; margin-bottom: 12px;">
+                    ⬆️ Upload Local Data to Cloud
+                </button>
+                <button class="btn-secondary" id="downloadCloudDataBtn" style="width: 100%; margin-bottom: 12px;">
+                    ⬇️ Download from Cloud
+                </button>
+            </div>
+
+            <!-- Account Section -->
+            <div class="account-section">
+                <h3>Account</h3>
+                <p style="font-size: 14px; color: #666; margin-bottom: 16px;">
+                    You're signed in anonymously. Your data syncs across devices using a secure anonymous ID.
+                </p>
+                <button class="btn-secondary" id="resetAccountBtn" style="width: 100%;">
+                    🔄 Reset Account (Sign Out)
+                </button>
+                <p style="font-size: 12px; color: #999; margin-top: 8px;">
+                    Warning: Resetting creates a new account. Save backups first!
+                </p>
+            </div>
+
+            <!-- Instructions -->
+            <div class="sync-instructions">
+                <h4>ℹ️ How Cloud Sync Works</h4>
+                <p><strong>✅ Automatic:</strong> Your rounds sync automatically when you save them</p>
+                <p><strong>🔒 Secure:</strong> Each device gets a unique anonymous ID - only you can access your data</p>
+                <p><strong>🌐 Cross-device:</strong> Access your rounds from any device (if using same browser profile)</p>
+                <p><strong>⚠️ Offline:</strong> If offline, data saves locally and syncs when back online</p>
             </div>
         </div>
 

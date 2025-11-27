@@ -76,6 +76,7 @@ body {
     box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
     transition: left 0.3s ease-in-out;
     overflow-y: auto;
+    padding-bottom: 80px; /* Make room for sync status widget */
 }
 
 .sidebar.active {
@@ -843,5 +844,157 @@ button {
 
     .storage-stats-grid {
         grid-template-columns: 1fr !important;
+    }
+}
+
+/* ===================================
+   CLOUD SYNC STYLES
+   =================================== */
+
+/* Sync status widget in sidebar */
+.sync-status-widget {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px;
+    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.03) 100%);
+    border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+.sync-status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.sync-icon {
+    font-size: 18px;
+}
+
+.sync-text {
+    font-size: 13px;
+    color: #666;
+    font-weight: 500;
+}
+
+.last-sync-time {
+    font-size: 11px;
+    color: #999;
+    padding-left: 26px;
+}
+
+/* Cloud Sync Screen */
+.sync-section,
+.sync-actions-section,
+.account-section,
+.sync-instructions {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.sync-section h3,
+.sync-actions-section h3,
+.account-section h3,
+.sync-instructions h4 {
+    color: #333;
+    font-size: 18px;
+    margin-bottom: 16px;
+}
+
+/* Cloud sync status display */
+.cloud-sync-status {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-radius: 8px;
+    border-left: 4px solid #3b82f6;
+}
+
+.sync-icon-large {
+    font-size: 32px;
+}
+
+.sync-status-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2196F3;
+}
+
+/* Sync details grid */
+.sync-details {
+    display: grid;
+    gap: 12px;
+}
+
+.sync-detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.detail-label {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+}
+
+.detail-value {
+    font-size: 14px;
+    color: #333;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+/* Sync instructions */
+.sync-instructions {
+    background: #e8f4f8;
+    border-left: 4px solid #3b82f6;
+}
+
+.sync-instructions h4 {
+    color: #1e40af;
+    font-size: 16px;
+    margin-bottom: 12px;
+}
+
+.sync-instructions p {
+    color: #1e3a8a;
+    font-size: 14px;
+    margin: 8px 0;
+    line-height: 1.5;
+}
+
+/* Mobile optimization for cloud sync */
+@media (max-width: 767px) {
+    .sync-section,
+    .sync-actions-section,
+    .account-section,
+    .sync-instructions {
+        padding: 16px;
+    }
+
+    .status-indicator {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .sync-icon-large {
+        font-size: 40px;
     }
 }
